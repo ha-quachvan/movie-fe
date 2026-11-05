@@ -422,30 +422,26 @@ export type UpdateRoomPayload = Partial<Omit<CreateRoomPayload, "cinemaId">>;
 // --- API QUẢN LÝ RẠP CHIẾU (CINEMAS) ---
 
 export async function getCinemas(): Promise<Cinema[]> {
-  const res = await apiFetch<any>("/cinemas");
-  const result = unwrapData<Cinema[]>(res);
+  const result = unwrapData<Cinema[]>(await apiFetch("/cinemas"));
   return Array.isArray(result) ? result : [];
 }
 
 export async function getCinemaById(id: number): Promise<Cinema> {
-  const res = await apiFetch<any>(`/cinemas/${id}`);
-  return unwrapData<Cinema>(res);
+  return unwrapData<Cinema>(await apiFetch(`/cinemas/${id}`));
 }
 
 export async function createCinema(payload: CreateCinemaPayload): Promise<Cinema> {
-  const res = await apiFetch<any>("/cinemas", {
+  return unwrapData<Cinema>(await apiFetch("/cinemas", {
     method: "POST",
     body: JSON.stringify(payload),
-  });
-  return unwrapData<Cinema>(res);
+  }));
 }
 
 export async function updateCinema(id: number, payload: UpdateCinemaPayload): Promise<Cinema> {
-  const res = await apiFetch<any>(`/cinemas/${id}`, {
+  return unwrapData<Cinema>(await apiFetch(`/cinemas/${id}`, {
     method: "PUT", // Đồng bộ dùng PUT với CinemasController
     body: JSON.stringify(payload),
-  });
-  return unwrapData<Cinema>(res);
+  }));
 }
 
 export async function deleteCinema(id: number): Promise<{ success: boolean }> {
@@ -457,8 +453,7 @@ export async function deleteCinema(id: number): Promise<{ success: boolean }> {
 // --- API QUẢN LÝ PHÒNG CHIẾU (ROOMS) ---
 
 export async function getRoomsByCinema(cinemaId: number): Promise<Room[]> {
-  const res = await apiFetch<any>(`/cinemas/${cinemaId}/rooms`);
-  const result = unwrapData<Room[]>(res);
+  const result = unwrapData<Room[]>(await apiFetch(`/cinemas/${cinemaId}/rooms`));
   return Array.isArray(result) ? result : [];
 }
 
