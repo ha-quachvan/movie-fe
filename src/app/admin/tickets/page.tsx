@@ -1,18 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import AdminNav from "@/components/admin/AdminNav";
 import {
   getBookingDetail,
   cancelAndRefundTicket,
-  BookingDetail,
   readApiError,
-  isAdmin,
 } from "@/lib/api";
 
 export default function AdminTicketsPage() {
-  const queryClient = useQueryClient();
   const [searchBookingCode, setSearchBookingCode] = useState("");
   const [activeCode, setActiveCode] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -23,7 +20,6 @@ export default function AdminTicketsPage() {
     data: booking,
     isLoading,
     isError,
-    error,
     refetch,
   } = useQuery({
     queryKey: ["admin-booking-detail", activeCode],
@@ -211,7 +207,7 @@ export default function AdminTicketsPage() {
             }}
           >
             <p style={{ color: "#ef4444", fontWeight: "700", fontSize: "16px", marginBottom: "6px" }}>
-              Không tìm thấy đơn đặt vé với mã "{activeCode}"
+              Không tìm thấy đơn đặt vé với mã &quot;{activeCode}&quot;
             </p>
             <p style={{ color: "#a1a1aa", fontSize: "13px" }}>
               Vui lòng kiểm tra lại tính chính xác của mã đặt chỗ hoặc phân quyền truy cập.

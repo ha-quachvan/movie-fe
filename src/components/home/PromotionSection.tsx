@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { useState } from "react";
 import { PROMOTIONS, Promotion } from "@/lib/mockData";
 
@@ -38,7 +40,7 @@ export default function PromotionSection() {
           >
             {/* Promo Image */}
             <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-800">
-              <img
+              <Image unoptimized width={800} height={500}
                 src={promo.image}
                 alt={promo.title}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"

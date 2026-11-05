@@ -39,19 +39,6 @@ const VALUES = [
   },
 ];
 
-function SocialLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a
-      href={href}
-      target={href.startsWith("http") ? "_blank" : undefined}
-      rel="noreferrer"
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#dbe7ff] transition-colors hover:border-[#ef4444] hover:bg-[#ef4444] hover:text-[#fff7f7]"
-    >
-      {children}
-    </a>
-  );
-}
-
 export default function AboutPage() {
   return (
     <div className="bg-[#120b0b] text-[#fff7f7]" style={{ fontFamily: "var(--font-be-vietnam), system-ui, sans-serif" }}>

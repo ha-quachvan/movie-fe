@@ -12,11 +12,10 @@ import {
   cancelShowtime,
   checkShowtimeConflict,
   Showtime,
-  Movie,
-  Cinema,
   Room,
   CreateShowtimePayload,
-  CheckConflictPayload,
+  UpdateShowtimePayload,
+  ShowtimeStatus,
   CheckConflictResponse,
   readApiError,
 } from "@/lib/api";
@@ -60,22 +59,16 @@ function ShowtimesManagerContent() {
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // 1. Fetch Danh sách Phim
-  const { data: movies = [], isLoading: isLoadingMovies } = useQuery({
+  const { data: movies = [] } = useQuery({
     queryKey: ["admin-movies-list"],
     queryFn: getMovies,
   });
 
   // 2. Fetch Danh sách Rạp & Phòng
-  const { data: rawCinemas = [], isLoading: isLoadingCinemas } = useQuery({
+  const { data: cinemas = [] } = useQuery({
     queryKey: ["admin-cinemas-list"],
     queryFn: getCinemas,
   });
-
-  const cinemas: Cinema[] = Array.isArray(rawCinemas)
-    ? rawCinemas
-    : (rawCinemas as any)?.data && Array.isArray((rawCinemas as any).data)
-    ? (rawCinemas as any).data
-    : [];
 
   // 3. Fetch Danh sách Suất chiếu theo bộ lọc
   const {
@@ -97,7 +90,7 @@ function ShowtimesManagerContent() {
         cinemaId: filterCinemaId !== "ALL" ? Number(filterCinemaId) : undefined,
         roomId: filterRoomId !== "ALL" ? Number(filterRoomId) : undefined,
         date: filterDate || undefined,
-        status: filterStatus !== "ALL" ? (filterStatus as any) : undefined,
+        status: filterStatus !== "ALL" ? (filterStatus as ShowtimeStatus) : undefined,
       }),
   });
 
@@ -172,7 +165,7 @@ function ShowtimesManagerContent() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: any }) => updateShowtime(id, payload),
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateShowtimePayload }) => updateShowtime(id, payload),
     onSuccess: () => {
       setIsModalOpen(false);
       setToastMessage({ text: "Cập nhật suất chiếu thành công!", type: "success" });
@@ -306,7 +299,7 @@ function ShowtimesManagerContent() {
         );
         return;
       }
-    } catch (err) {
+    } catch {
       // Nếu không kiểm tra được, tiếp tục gửi để backend chặn
     }
 

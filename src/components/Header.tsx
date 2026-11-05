@@ -1,12 +1,16 @@
 "use client";
 
+import Image from "next/image";
+
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/Logo";
 import { useProfile } from "@/hooks/useProfile";
-import { clearTokens, getAccessToken, isAdmin, type Profile } from "@/lib/api";
+import { clearTokens, type Profile } from "@/lib/api";
+
+import { useAccessToken, useClientReady, useIsAdmin } from "@/hooks/useClientState";
 
 const NAV = [
   { href: "/", label: "Trang chủ" },
@@ -26,7 +30,7 @@ function Avatar({ profile, size = 36 }: { profile?: Profile; size?: number }) {
   const pic = profile?.profile_picture;
   if (pic && typeof pic === "string" && /^https?:\/\//.test(pic)) {
     return (
-      <img
+      <Image unoptimized
         src={pic}
         alt={(profile?.full_name || profile?.fullName) ?? "Avatar"}
         width={size}
@@ -52,35 +56,29 @@ function Avatar({ profile, size = 36 }: { profile?: Profile; size?: number }) {
 
 export default function Header() {
   const pathname = usePathname();
+  return <HeaderContent key={pathname} pathname={pathname} />;
+}
+
+function HeaderContent({ pathname }: { pathname: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [userIsAdmin, setUserIsAdmin] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    setUserIsAdmin(isAdmin());
-  }, []);
-
+  const mounted = useClientReady();
+  const token = useAccessToken();
+  const userIsAdmin = useIsAdmin();
   const { data: profile, isError } = useProfile();
-  const loggedIn = mounted && !!getAccessToken() && !isError;
-
-  useEffect(() => {
-    setOpen(false);
-    setMenuOpen(false);
-  }, [pathname]);
+  const loggedIn = mounted && Boolean(token) && !isError;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   function handleLogout() {
     clearTokens();
-    queryClient.removeQueries({ queryKey: ["profile"] });
+    queryClient.clear();
     setOpen(false);
     setMenuOpen(false);
-    setUserIsAdmin(false);
+
     router.push("/");
     router.refresh();
   }

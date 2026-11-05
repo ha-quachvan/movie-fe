@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
+
 import { Movie } from "@/lib/mockData";
 
 interface MovieCardProps {
@@ -28,7 +29,7 @@ export default function MovieCard({ movie, onWatchTrailer }: MovieCardProps) {
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/5 bg-neutral-900/60 transition-all duration-300 hover:-translate-y-1.5 hover:border-red-500/30 hover:shadow-2xl hover:shadow-red-600/20">
       {/* Poster Wrap (aspect ratio 2:3) */}
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-neutral-950">
-        <img
+        <Image unoptimized width={600} height={900}
           src={movie.posterUrl}
           alt={movie.title}
           loading="lazy"

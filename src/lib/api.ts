@@ -18,12 +18,16 @@ export function setTokens(access: string, refresh?: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem(ACCESS_KEY, access);
   if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
+  else localStorage.removeItem(REFRESH_KEY);
+  window.dispatchEvent(new Event("auth-change"));
 }
 
 export function clearTokens() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem("user");
+  window.dispatchEvent(new Event("auth-change"));
 }
 
 // Bổ sung helper lấy User Profile và kiểm tra Admin
@@ -119,7 +123,9 @@ export interface LoginResponse {
   access?: string;
   refresh?: string;
   user?: unknown;
-  data?: any;
+  data?: LoginResponse;
+  result?: LoginResponse;
+  refreshToken?: string;
   [key: string]: unknown;
 }
 
@@ -137,20 +143,21 @@ export async function login(email: string, password: string): Promise<LoginRespo
   const token =
     data.accessToken ||
     data.access ||
-    (data.data as any)?.accessToken ||
-    (data.result as any)?.accessToken;
+    data.data?.accessToken ||
+    data.result?.accessToken;
 
   const refresh =
     data.refreshToken ||
     data.refresh ||
-    (data.data as any)?.refreshToken;
+    data.data?.refreshToken;
 
-  const user = data.user || (data.data as any)?.user;
+  const user = data.user || data.data?.user;
 
   if (token) {
     setTokens(token, refresh);
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
+      window.dispatchEvent(new Event("auth-change"));
     }
   } else {
     throw new ApiError(500, { message: "Không tìm thấy token trong phản hồi từ server!" });
@@ -227,27 +234,14 @@ export interface Profile {
   current_streak?: number;
   longest_streak?: number;
   created_at?: string;
+  createdAt?: string;
+  role?: string;
+  status?: string;
 }
 
 export async function getProfile(): Promise<Profile> {
-  return apiFetch<Profile>("auth/profile");
-}
-
-export interface UpdateProfilePayload {
-  full_name?: string;
-  fullName?: string;
-  phone_number?: string;
-  phoneNumber?: string;
-  profile_picture?: string;
-}
-
-export async function updateProfile(
-  payload: UpdateProfilePayload
-): Promise<{ message?: string; data: Profile }> {
-  return apiFetch<{ message?: string; data: Profile }>(
-    "auth/profile",
-    { method: "PATCH", body: JSON.stringify(payload) }
-  );
+  const response = await apiFetch<{ data: Profile }>("users/me");
+  return unwrapData<Profile>(response);
 }
 
 export async function logout() {
@@ -407,7 +401,7 @@ export interface CreateCinemaPayload {
   status?: string;
 }
 
-export interface UpdateCinemaPayload extends Partial<CreateCinemaPayload> {}
+export type UpdateCinemaPayload = Partial<CreateCinemaPayload>;
 
 // Interface cấu hình phân loại ghế (Thường, VIP, Sweetbox...)
 export interface SeatConfig {
@@ -423,7 +417,7 @@ export interface CreateRoomPayload {
   status?: string;
 }
 
-export interface UpdateRoomPayload extends Partial<Omit<CreateRoomPayload, "cinemaId">> {}
+export type UpdateRoomPayload = Partial<Omit<CreateRoomPayload, "cinemaId">>;
 
 // --- API QUẢN LÝ RẠP CHIẾU (CINEMAS) ---
 
@@ -484,11 +478,10 @@ export async function createRoom(payload: CreateRoomPayload): Promise<Room> {
     ...(payload.status ? { status: payload.status } : {}),
   };
 
-  const res = await apiFetch<any>("/cinemas/rooms", {
+  return unwrapData<Room>(await apiFetch("/cinemas/rooms", {
     method: "POST",
     body: JSON.stringify(sanitizedPayload),
-  });
-  return unwrapData<Room>(res);
+  }));
 }
 
 export async function updateRoom(id: number, payload: UpdateRoomPayload): Promise<Room> {
@@ -497,11 +490,10 @@ export async function updateRoom(id: number, payload: UpdateRoomPayload): Promis
     ...(payload.totalSeats !== undefined ? { totalSeats: Number(payload.totalSeats) } : {}),
   };
 
-  const res = await apiFetch<any>(`/cinemas/rooms/${id}`, {
+  return unwrapData<Room>(await apiFetch(`/cinemas/rooms/${id}`, {
     method: "PUT",
     body: JSON.stringify(sanitizedPayload),
-  });
-  return unwrapData<Room>(res);
+  }));
 }
 
 export async function deleteRoom(id: number): Promise<{ success: boolean }> {
@@ -555,8 +547,11 @@ function unwrapData<T>(res: unknown): T {
 
 export async function getSeatsByRoom(roomId: number): Promise<Seat[]> {
   const res = await apiFetch<{ data: Seat[] } | Seat[]>(`seats/room/${roomId}`);
-  const result = unwrapData<Seat[]>(res);
-  return Array.isArray(result) ? result : [];
+  const result = unwrapData<(Seat & { label?: string; priceCoefficient?: number })[]>(res);
+  return Array.isArray(result) ? result.map(seat => ({ ...seat, roomId,
+    seatNumber: seat.seatNumber ?? seat.label ?? `${seat.row}${seat.column}`,
+    priceMultiplier: Number(seat.priceMultiplier ?? seat.priceCoefficient ?? 1),
+  })) : [];
 }
 
 export async function generateSeatsGrid(

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { readApiError } from "@/lib/api";
 import { useLogin } from "@/hooks/useAuth";
 import { useToast } from "@/components/Toast";
@@ -17,7 +16,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const router = useRouter();
   const loginMutation = useLogin();
   const toast = useToast();
 
@@ -29,7 +27,9 @@ export default function LoginPage() {
         onSuccess: () => {
           toast.success("Đăng nhập thành công", "Chào mừng trở lại!");
           // Dùng window.location.href để load lại toàn bộ trạng thái Auth chuẩn xác nhất
-          window.location.href = "/";
+          const redirect = new URLSearchParams(window.location.search).get("redirect");
+          const target = redirect ? new URL(redirect, window.location.origin) : null;
+          window.location.assign(target?.origin === window.location.origin ? target.href : "/");
         },
         onError: (err) => toast.error("Đăng nhập thất bại", readApiError(err)),
       }

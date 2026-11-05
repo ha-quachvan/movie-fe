@@ -11,11 +11,9 @@ import {
 } from "@/lib/api";
 
 export function useLogin() {
-  const router = useRouter();
   return useMutation({
     mutationFn: (vars: { email: string; password: string }) =>
       login(vars.email, vars.password),
-    onSuccess: () => router.push("/"),
   });
 }
 

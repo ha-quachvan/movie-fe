@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getCinemas,
@@ -19,26 +19,10 @@ import {
   SeatConfig,
   readApiError,
 } from "@/lib/api";
-import { THEATERS } from "@/lib/mockData";
 import Link from "next/link";
 import AdminNav from "@/components/admin/AdminNav";
 
 const CITIES = ["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Cần Thơ", "Hải Phòng"];
-
-// Adapter chuyển đổi dữ liệu rạp mẫu THEATERS sang kiểu Cinema của API
-const MOCK_CINEMAS: Cinema[] = THEATERS.map((t, index) => ({
-  id: index + 1,
-  name: t.name,
-  address: t.address,
-  city: t.city,
-  phone: t.phone,
-  rooms: Array.from({ length: t.roomsCount }).map((_, rIdx) => ({
-    id: (index + 1) * 10 + rIdx + 1,
-    name: `Screen 0${rIdx + 1}`,
-    totalSeats: 96,
-    cinemaId: index + 1,
-  })),
-}));
 
 export default function AdminCinemasPage() {
   const queryClient = useQueryClient();
@@ -57,7 +41,7 @@ export default function AdminCinemasPage() {
   const [cinemaFormError, setCinemaFormError] = useState("");
 
   // State Modal Quản lý Phòng Chiếu
-  const [activeCinemaForRooms, setActiveCinemaForRooms] = useState<Cinema | null>(null);
+  const [activeCinemaChoice, setActiveCinemaForRooms] = useState<Cinema | null>(null);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [roomName, setRoomName] = useState("");
 
@@ -78,17 +62,11 @@ export default function AdminCinemasPage() {
     : (rawCinemas as unknown as { data: Cinema[] })?.data &&
       Array.isArray((rawCinemas as unknown as { data: Cinema[] }).data)
     ? (rawCinemas as unknown as { data: Cinema[] }).data
-    : MOCK_CINEMAS;
+    : [];
 
-  // Tự động cập nhật lại thông tin phòng chiếu trong Modal khi Query refetch thành công
-  useEffect(() => {
-    if (activeCinemaForRooms) {
-      const updatedCinema = cinemasList.find((c) => c.id === activeCinemaForRooms.id);
-      if (updatedCinema) {
-        setActiveCinemaForRooms(updatedCinema);
-      }
-    }
-  }, [cinemasList]);
+  const activeCinemaForRooms = activeCinemaChoice
+    ? cinemasList.find(cinema => cinema.id === activeCinemaChoice.id) ?? null
+    : null;
 
   const createCinemaMutation = useMutation({
     mutationFn: (payload: CreateCinemaPayload) => createCinema(payload),

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -293,7 +295,7 @@ export default function AdminMoviesPage() {
                   <tr key={movie.id} style={{ borderBottom: "1px solid #27272a" }}>
                     <td style={{ padding: "14px 16px", color: "#71717a", fontWeight: "600" }}>#{movie.id}</td>
                     <td style={{ padding: "14px 16px" }}>
-                      <img
+                      <Image unoptimized width={42} height={60}
                         src={movie.posterUrl || "https://via.placeholder.com/45x65"}
                         alt={movie.title}
                         style={{ width: "42px", height: "60px", objectFit: "cover", borderRadius: "6px", border: "1px solid #3f3f46" }}

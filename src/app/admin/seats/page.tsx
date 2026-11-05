@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AdminNav from "@/components/admin/AdminNav";
@@ -10,7 +10,6 @@ import {
   generateSeatsGrid,
   createSeat,
   deleteSeat,
-  Cinema,
   Room,
   Seat,
   SeatType,
@@ -26,10 +25,10 @@ function SeatsManagerContent() {
   const initialRoomId = searchParams.get("roomId");
 
   // Selection states
-  const [selectedCinemaId, setSelectedCinemaId] = useState<number | null>(
+  const [chosenCinemaId, setSelectedCinemaId] = useState<number | null>(
     initialCinemaId ? Number(initialCinemaId) : null
   );
-  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(
+  const [chosenRoomId, setSelectedRoomId] = useState<number | null>(
     initialRoomId ? Number(initialRoomId) : null
   );
 
@@ -55,42 +54,15 @@ function SeatsManagerContent() {
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // 1. Fetch danh sách Rạp & Phòng
-  const { data: rawCinemas = [], isLoading: isLoadingCinemas } = useQuery({
+  const { data: cinemas = [], isLoading: isLoadingCinemas } = useQuery({
     queryKey: ["admin-cinemas-for-seats"],
     queryFn: getCinemas,
   });
-
-  const cinemas: Cinema[] = Array.isArray(rawCinemas)
-    ? rawCinemas
-    : (rawCinemas as any)?.data && Array.isArray((rawCinemas as any).data)
-    ? (rawCinemas as any).data
-    : [];
-
-  // Tự động chọn rạp đầu tiên nếu chưa chọn
-  useEffect(() => {
-    if (!selectedCinemaId && cinemas.length > 0) {
-      setSelectedCinemaId(cinemas[0].id);
-    }
-  }, [cinemas, selectedCinemaId]);
-
-  // Danh sách các phòng thuộc rạp đã chọn
-  const currentCinema = useMemo(() => {
-    return cinemas.find((c) => c.id === selectedCinemaId) || null;
-  }, [cinemas, selectedCinemaId]);
-
-  const availableRooms: Room[] = currentCinema?.rooms || [];
-
-  // Tự động chọn phòng đầu tiên khi đổi rạp
-  useEffect(() => {
-    if (availableRooms.length > 0) {
-      const roomExists = availableRooms.some((r) => r.id === selectedRoomId);
-      if (!roomExists) {
-        setSelectedRoomId(availableRooms[0].id);
-      }
-    } else {
-      setSelectedRoomId(null);
-    }
-  }, [availableRooms, selectedRoomId]);
+  const currentCinema = cinemas.find(cinema => cinema.id === chosenCinemaId) ?? cinemas[0] ?? null;
+  const selectedCinemaId = currentCinema?.id ?? null;
+  const availableRooms: Room[] = currentCinema?.rooms ?? [];
+  const selectedRoomId = availableRooms.some(room => room.id === chosenRoomId)
+    ? chosenRoomId : availableRooms[0]?.id ?? null;
 
   // 2. Fetch danh sách ghế của phòng đang chọn
   const {

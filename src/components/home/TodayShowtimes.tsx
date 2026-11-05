@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { useState } from "react";
 import Link from "next/link";
 import { Movie, Theater } from "@/lib/mockData";
@@ -103,7 +105,7 @@ export default function TodayShowtimes({ theaters, movies, keyword, onKeywordCha
                 {/* Poster Thumbnail */}
                 <div className="flex items-center gap-4 sm:w-72 shrink-0">
                   <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-neutral-800 shadow-md">
-                    <img
+                    <Image unoptimized width={64} height={96}
                       src={movie.posterUrl}
                       alt={movie.title}
                       className="h-full w-full object-cover"

@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
+
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Movie } from "@/lib/mockData";
 
 interface HeroBannerProps {
@@ -49,7 +50,7 @@ export default function HeroBanner({ movies, onWatchTrailer }: HeroBannerProps) 
           }`}
           style={{ transitionProperty: "opacity, transform" }}
         >
-          <img
+          <Image unoptimized width={1920} height={1080}
             src={movie.backdropUrl}
             alt={movie.title}
             className="h-full w-full object-cover object-center filter brightness-[0.45] contrast-[1.08]"

@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { getMovies, getShowtimes, Movie as BackendMovie, isAdmin } from "@/lib/api";
+import { getMovies, getShowtimes, Movie as BackendMovie } from "@/lib/api";
 import { MOVIES, THEATERS } from "@/lib/mockData";
 import { emptyFilters, timeLabel, price, type CinemaMovie, type CinemaShowtime,type Filters } from "@/components/cinema/cinema-api";
 import { demoCatalog } from "@/components/cinema/demo-data";
+import { useIsAdmin } from "@/hooks/useClientState";
 import Poster from "@/components/cinema/Poster";
 import styles from "@/components/cinema/cinema.module.css";
 
@@ -141,11 +142,7 @@ export default function MovieExplorer() {
   const [status, setStatus] = useState("NOW_SHOWING");
   const [sort, setSort] = useState("title");
   const [filterError, setFilterError] = useState("");
-  const [userIsAdmin, setUserIsAdmin] = useState(false);
-
-  useEffect(() => {
-    setUserIsAdmin(isAdmin());
-  }, []);
+  const userIsAdmin = useIsAdmin();
 
   const query = useQuery({
     queryKey: ["cinema-movies", demo, applied],

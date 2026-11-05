@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -21,6 +23,8 @@ export default function MyTicketsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState<BookingDetail | null>(null);
   const [bookingToCancel, setBookingToCancel] = useState<BookingDetail | null>(null);
@@ -52,7 +56,7 @@ export default function MyTicketsPage() {
     mutationFn: (bookingCode: string) => cancelAndRefundTicket(bookingCode),
     onSuccess: (data) => {
       setToast({
-        message: `Hủy vé ${data.bookingCode} thành công! Đã hoàn tiền về tài khoản.`,
+        message: `Hủy vé ${data.bookingCode} thành công. Kiểm tra trạng thái hoàn tiền trong chi tiết vé.`,
         type: "success",
       });
       setBookingToCancel(null);
@@ -118,7 +122,6 @@ export default function MyTicketsPage() {
   const getMinutesUntilShowtime = (startTimeStr?: string) => {
     if (!startTimeStr) return -9999;
     const start = new Date(startTimeStr).getTime();
-    const now = Date.now();
     return Math.floor((start - now) / (1000 * 60));
   };
 
@@ -630,7 +633,7 @@ export default function MyTicketsPage() {
                       }}
                     >
                       {movie?.posterUrl ? (
-                        <img
+                        <Image unoptimized width={200} height={300}
                           src={movie.posterUrl}
                           alt={movie.title || "Movie Poster"}
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}

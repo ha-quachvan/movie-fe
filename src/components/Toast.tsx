@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useClientReady } from "@/hooks/useClientState";
 import { createPortal } from "react-dom";
 
 type ToastVariant = "success" | "error" | "info" | "warning";
@@ -173,15 +174,15 @@ function ToastCard({
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientReady();
   const idRef = useRef(0);
   const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    setMounted(true);
+    const activeTimers = timers.current;
     return () => {
-      timers.current.forEach((t) => clearTimeout(t));
-      timers.current.clear();
+      activeTimers.forEach((t) => clearTimeout(t));
+      activeTimers.clear();
     };
   }, []);
 
