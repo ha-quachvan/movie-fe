@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   getMyBookings,
   cancelAndRefundTicket,
+  mockPayBooking,
   BookingDetail,
   BookingTicket,
   getAccessToken,
@@ -65,6 +66,25 @@ export default function MyTicketsPage() {
       });
     },
   });
+
+  // Mutation thanh toán vé mô phỏng (Stripe Mock)
+  const payMutation = useMutation({
+    mutationFn: (bookingCode: string) => mockPayBooking(bookingCode),
+    onSuccess: (data) => {
+      setToast({
+        message: `Thanh toán thành công đơn vé ${data?.booking?.bookingCode || ""}! Vé đã chuyển sang trạng thái hợp lệ.`,
+        type: "success",
+      });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+    },
+    onError: (err) => {
+      setToast({
+        message: readApiError(err, "Không thể thanh toán đơn vé. Vui lòng thử lại."),
+        type: "error",
+      });
+    },
+  });
+
 
   // Tự tắt Toast sau 5 giây
   useEffect(() => {
@@ -759,6 +779,30 @@ export default function MyTicketsPage() {
                       >
                         🔍 Cuống vé chi tiết
                       </button>
+
+                      {/* Nút Thanh toán ngay nếu trạng thái PENDING */}
+                      {isPending && (
+                        <button
+                          onClick={() => payMutation.mutate(booking.bookingCode)}
+                          disabled={payMutation.isPending}
+                          style={{
+                            width: "100%",
+                            padding: "8px 14px",
+                            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                            color: "#ffffff",
+                            border: "1px solid #10b981",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: payMutation.isPending ? "not-allowed" : "pointer",
+                            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          {payMutation.isPending ? "⏳ Đang xử lý..." : "💳 Thanh toán ngay (Mock)"}
+                        </button>
+                      )}
+
 
                       {/* Nút Hủy vé & Hoàn tiền (theo BR-01) */}
                       {isConfirmed && (

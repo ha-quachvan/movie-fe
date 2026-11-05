@@ -140,6 +140,27 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
         <button type="button" disabled={!canBook} onClick={() => void createBooking()} className={styles.primary}>{busy ? "Đang xử lý…" : booking ? "Đã tạo booking ✓" : demo ? "Xem tóm tắt lựa chọn →" : "Tạo booking →"}</button>
         <p className={styles.ticketNote}>{demo ? "Bản xem thử không phát sinh giao dịch." : "Ghế được giữ tối đa 5 phút. Tạo booking không gia hạn thời gian giữ ghế."}</p>
         {booking && <p className={styles.success}>Mã booking: <strong>{booking}</strong><br />Trạng thái: Chờ thanh toán.</p>}
+        {booking && (
+          <div style={{ marginTop: "12px" }}>
+            <Link
+              href="/my-tickets"
+              style={{
+                display: "block",
+                textAlign: "center",
+                padding: "10px 16px",
+                background: "linear-gradient(135deg, #e50914 0%, #b91c1c 100%)",
+                color: "#ffffff",
+                borderRadius: "8px",
+                fontWeight: "700",
+                fontSize: "13px",
+                textDecoration: "none",
+                boxShadow: "0 4px 12px rgba(229, 9, 20, 0.4)",
+              }}
+            >
+              🎟️ Đến "Vé Của Tôi" để xem & thanh toán →
+            </Link>
+          </div>
+        )}
       </aside>
     </div>
     {actionError && <p role="alert" className={styles.error}>{actionError}</p>}

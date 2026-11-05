@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { getMovies, Movie as BackendMovie, isAdmin } from "@/lib/api";
+import { getMovies, getShowtimes, Movie as BackendMovie, isAdmin } from "@/lib/api";
 import { MOVIES, THEATERS } from "@/lib/mockData";
 import { emptyFilters, timeLabel, price, type CinemaMovie, type CinemaShowtime,type Filters } from "@/components/cinema/cinema-api";
 import { demoCatalog } from "@/components/cinema/demo-data";
@@ -151,8 +151,34 @@ export default function MovieExplorer() {
     queryKey: ["cinema-movies", demo, applied],
     queryFn: async () => {
       if (demo) return demoCatalog(applied);
-      const rawMovies = await getMovies();
-      let result = rawMovies.map(adaptBackendToCinemaMovie);
+      const [rawMovies, rawShowtimes] = await Promise.all([
+        getMovies(),
+        getShowtimes().catch(() => []),
+      ]);
+
+      let result = rawMovies.map((m) => {
+        const realShowtimes: CinemaShowtime[] = rawShowtimes
+          .filter((st) => st.movieId === m.id)
+          .map((st) => ({
+            id: String(st.id),
+            startTime: st.startTime,
+            basePrice: Number(st.basePrice),
+            room: {
+              id: String(st.roomId),
+              name: st.room?.name || `Screen ${st.roomId}`,
+              cinema: {
+                id: String(st.room?.cinema?.id || "1"),
+                name: st.room?.cinema?.name || "Rạp CineBook",
+              },
+            },
+          }));
+
+        const adapted = adaptBackendToCinemaMovie(m);
+        if (realShowtimes.length > 0) {
+          adapted.showtimes = realShowtimes;
+        }
+        return adapted;
+      });
 
       if (applied.keyword) {
         const kw = applied.keyword.toLowerCase();

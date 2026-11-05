@@ -66,10 +66,16 @@ function ShowtimesManagerContent() {
   });
 
   // 2. Fetch Danh sách Rạp & Phòng
-  const { data: cinemas = [], isLoading: isLoadingCinemas } = useQuery({
+  const { data: rawCinemas = [], isLoading: isLoadingCinemas } = useQuery({
     queryKey: ["admin-cinemas-list"],
     queryFn: getCinemas,
   });
+
+  const cinemas: Cinema[] = Array.isArray(rawCinemas)
+    ? rawCinemas
+    : (rawCinemas as any)?.data && Array.isArray((rawCinemas as any).data)
+    ? (rawCinemas as any).data
+    : [];
 
   // 3. Fetch Danh sách Suất chiếu theo bộ lọc
   const {

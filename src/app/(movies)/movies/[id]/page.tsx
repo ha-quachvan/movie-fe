@@ -3,7 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { getMovieById } from "@/lib/api";
+import { getMovieById, getShowtimes, Showtime } from "@/lib/api";
 import { MOVIES, THEATERS } from "@/lib/mockData";
 import { timeLabel, price } from "@/components/cinema/cinema-api";
 import Poster from "@/components/cinema/Poster";
@@ -45,13 +45,26 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  // Lấy các suất chiếu mẫu từ mockData tương ứng với phim (nếu có)
+  // Fetch suất chiếu thật từ Backend
+  const { data: rawShowtimes = [] } = useQuery({
+    queryKey: ["movie-detail-showtimes", movie.id],
+    queryFn: () => getShowtimes({ movieId: movie.id }),
+  });
+
+  const realShowtimes = (rawShowtimes as Showtime[]).map((st: Showtime) => ({
+    id: String(st.id),
+    startTime: st.startTime,
+    basePrice: Number(st.basePrice),
+    cinemaName: st.room?.cinema?.name || "Rạp CineBook",
+    roomName: st.room?.name || `Screen ${st.roomId}`,
+  }));
+
+  // Lấy các suất chiếu mẫu từ mockData làm fallback (nếu backend chưa có)
   const matchedDemoMovie = MOVIES.find(
     (demo) => String(demo.id) === String(movie.id) || demo.title.toLowerCase() === movie.title.toLowerCase()
   );
-
   const today = new Date().toISOString().split("T")[0];
-  const showtimes = matchedDemoMovie
+  const demoShowtimes = matchedDemoMovie
     ? THEATERS.flatMap((theater) =>
         theater.schedules
           .filter((schedule) => schedule.movieId === matchedDemoMovie.id)
@@ -66,6 +79,8 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
           )
       )
     : [];
+
+  const showtimes = realShowtimes.length > 0 ? realShowtimes : demoShowtimes;
 
   const embedUrl = getEmbedTrailerUrl(movie.trailerUrl);
 
@@ -150,7 +165,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
 
           {showtimes.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
-              {showtimes.map((st) => (
+              {showtimes.map((st: any) => (
                 <Link
                   key={st.id}
                   href={`/booking/seats?movieId=${movie.id}&showtimeId=${st.id}`}

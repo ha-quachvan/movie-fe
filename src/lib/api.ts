@@ -428,25 +428,30 @@ export interface UpdateRoomPayload extends Partial<Omit<CreateRoomPayload, "cine
 // --- API QUẢN LÝ RẠP CHIẾU (CINEMAS) ---
 
 export async function getCinemas(): Promise<Cinema[]> {
-  return apiFetch<Cinema[]>("/cinemas");
+  const res = await apiFetch<any>("/cinemas");
+  const result = unwrapData<Cinema[]>(res);
+  return Array.isArray(result) ? result : [];
 }
 
 export async function getCinemaById(id: number): Promise<Cinema> {
-  return apiFetch<Cinema>(`/cinemas/${id}`);
+  const res = await apiFetch<any>(`/cinemas/${id}`);
+  return unwrapData<Cinema>(res);
 }
 
 export async function createCinema(payload: CreateCinemaPayload): Promise<Cinema> {
-  return apiFetch<Cinema>("/cinemas", {
+  const res = await apiFetch<any>("/cinemas", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+  return unwrapData<Cinema>(res);
 }
 
 export async function updateCinema(id: number, payload: UpdateCinemaPayload): Promise<Cinema> {
-  return apiFetch<Cinema>(`/cinemas/${id}`, {
+  const res = await apiFetch<any>(`/cinemas/${id}`, {
     method: "PUT", // Đồng bộ dùng PUT với CinemasController
     body: JSON.stringify(payload),
   });
+  return unwrapData<Cinema>(res);
 }
 
 export async function deleteCinema(id: number): Promise<{ success: boolean }> {
@@ -458,7 +463,9 @@ export async function deleteCinema(id: number): Promise<{ success: boolean }> {
 // --- API QUẢN LÝ PHÒNG CHIẾU (ROOMS) ---
 
 export async function getRoomsByCinema(cinemaId: number): Promise<Room[]> {
-  return apiFetch<Room[]>(`/cinemas/${cinemaId}/rooms`);
+  const res = await apiFetch<any>(`/cinemas/${cinemaId}/rooms`);
+  const result = unwrapData<Room[]>(res);
+  return Array.isArray(result) ? result : [];
 }
 
 export async function createRoom(payload: CreateRoomPayload): Promise<Room> {
@@ -477,10 +484,11 @@ export async function createRoom(payload: CreateRoomPayload): Promise<Room> {
     ...(payload.status ? { status: payload.status } : {}),
   };
 
-  return apiFetch<Room>("/cinemas/rooms", {
+  const res = await apiFetch<any>("/cinemas/rooms", {
     method: "POST",
     body: JSON.stringify(sanitizedPayload),
   });
+  return unwrapData<Room>(res);
 }
 
 export async function updateRoom(id: number, payload: UpdateRoomPayload): Promise<Room> {
@@ -489,10 +497,11 @@ export async function updateRoom(id: number, payload: UpdateRoomPayload): Promis
     ...(payload.totalSeats !== undefined ? { totalSeats: Number(payload.totalSeats) } : {}),
   };
 
-  return apiFetch<Room>(`/cinemas/rooms/${id}`, {
+  const res = await apiFetch<any>(`/cinemas/rooms/${id}`, {
     method: "PUT",
     body: JSON.stringify(sanitizedPayload),
   });
+  return unwrapData<Room>(res);
 }
 
 export async function deleteRoom(id: number): Promise<{ success: boolean }> {
@@ -799,6 +808,14 @@ export async function cancelAndRefundTicket(bookingCode: string): Promise<Cancel
     }
   );
   return unwrapData<CancelTicketResponse>(res);
+}
+
+export async function mockPayBooking(bookingCode: string): Promise<any> {
+  const res = await apiFetch<any>("bookings/pay-mock", {
+    method: "POST",
+    body: JSON.stringify({ bookingCode, stripeToken: "tok_visa" }),
+  });
+  return unwrapData(res);
 }
 
 // ==========================================

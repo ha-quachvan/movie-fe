@@ -55,10 +55,16 @@ function SeatsManagerContent() {
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // 1. Fetch danh sách Rạp & Phòng
-  const { data: cinemas = [], isLoading: isLoadingCinemas } = useQuery({
+  const { data: rawCinemas = [], isLoading: isLoadingCinemas } = useQuery({
     queryKey: ["admin-cinemas-for-seats"],
     queryFn: getCinemas,
   });
+
+  const cinemas: Cinema[] = Array.isArray(rawCinemas)
+    ? rawCinemas
+    : (rawCinemas as any)?.data && Array.isArray((rawCinemas as any).data)
+    ? (rawCinemas as any).data
+    : [];
 
   // Tự động chọn rạp đầu tiên nếu chưa chọn
   useEffect(() => {
