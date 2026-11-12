@@ -1,11 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { Suspense, use } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { getMovieById } from "@/lib/api";
-import { MOVIES, THEATERS } from "@/lib/mockData";
-import { timeLabel, price } from "@/components/cinema/cinema-api";
+import { getMovieById, getShowtimes } from "@/lib/api";
+import { demoCatalog } from "@/components/cinema/demo-data";
+import { normalizeMovie, emptyFilters, timeLabel, price, type CinemaMovie } from "@/components/cinema/cinema-api";
 import Poster from "@/components/cinema/Poster";
 import styles from "@/components/cinema/cinema.module.css";
 
@@ -16,13 +17,26 @@ function getEmbedTrailerUrl(url?: string | null) {
 }
 
 export default function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = Number(resolvedParams.id);
+  const { id } = use(params);
+  return <Suspense fallback={<p>Đang tải phim…</p>}><MovieDetails id={id} /></Suspense>;
+}
 
-  const { data: movie, isLoading, isError, error } = useQuery({
-    queryKey: ["movie-detail", movieId],
-    queryFn: () => getMovieById(movieId),
-    enabled: !isNaN(movieId),
+function MovieDetails({ id }: { id: string }) {
+  const params = useSearchParams();
+  const demo = params.get("demo") === "1";
+  const valid = demo ? /^m-\d+$/.test(id) : /^[1-9]\d*$/.test(id);
+  const { data: movie, isLoading, isError, error } = useQuery<CinemaMovie>({
+    queryKey: ["movie-detail", demo, id],
+    enabled: valid,
+    queryFn: async () => {
+      if (demo) {
+        const movie = demoCatalog(emptyFilters).find(m => String(m.id) === id);
+        if (!movie) throw new Error("Phim xem thử không tồn tại.");
+        return movie;
+      }
+      const [movie, showtimes] = await Promise.all([getMovieById(Number(id)), getShowtimes({ movieId: Number(id), status: "SCHEDULED" })]);
+      return normalizeMovie({ ...movie, showtimes: showtimes.filter(s => new Date(s.startTime).getTime() > Date.now()) });
+    },
   });
 
   if (isLoading) {
@@ -45,32 +59,13 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  // Lấy các suất chiếu mẫu từ mockData tương ứng với phim (nếu có)
-  const matchedDemoMovie = MOVIES.find(
-    (demo) => String(demo.id) === String(movie.id) || demo.title.toLowerCase() === movie.title.toLowerCase()
-  );
-
-  const today = new Date().toISOString().split("T")[0];
-  const showtimes = matchedDemoMovie
-    ? THEATERS.flatMap((theater) =>
-        theater.schedules
-          .filter((schedule) => schedule.movieId === matchedDemoMovie.id)
-          .flatMap((schedule) =>
-            schedule.showtimes.map((st) => ({
-              id: st.id,
-              startTime: `${today}T${st.time}:00+07:00`,
-              basePrice: st.price,
-              cinemaName: theater.name,
-              roomName: st.room,
-            }))
-          )
-      )
-    : [];
+  const showtimes = (movie.showtimes || []).map(s => ({...s, cinemaName: s.room?.cinema?.name, roomName: s.room?.name}));
 
   const embedUrl = getEmbedTrailerUrl(movie.trailerUrl);
 
   return (
     <div className={styles.page}>
+      {demo && <p className={styles.demoNotice}>Chế độ xem thử — không tạo booking hay thanh toán thật.</p>}
       {/* Banner Backdrop */}
       <div
         style={{
@@ -153,7 +148,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
               {showtimes.map((st) => (
                 <Link
                   key={st.id}
-                  href={`/booking/seats?movieId=${movie.id}&showtimeId=${st.id}`}
+                  href={`/booking/seats?movieId=${movie.id}&showtimeId=${st.id}${demo ? "&demo=1" : ""}`}
                   style={{
                     display: "block",
                     padding: "12px",

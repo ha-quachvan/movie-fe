@@ -14,7 +14,7 @@ export default function SeatSelection() {
   const params = useSearchParams();
   const accessToken = useAccessToken();
   const id = params.get("showtimeId") || "";
-  const demo = params.get("demo") === "1" || /^st-/.test(id) || /^m-/.test(params.get("movieId") || "");
+  const demo = params.get("demo") === "1";
   return <SeatScreen key={`${demo}:${id}:${params.get("date")}:${accessToken}`} id={id} demo={demo} movieId={params.get("movieId")} day={params.get("date")} />;
 }
 
@@ -27,6 +27,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
   const [message, setMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [bookingCode, setBookingCode] = useState<string | null>(null);
+  const [bookingDeadline, setBookingDeadline] = useState<number | null>(null);
   
   const action = useRef<AbortController | null>(null);
   const holdTokensRef = useRef<Record<number, string>>({}); // Lưu trữ holdToken ứng với từng seatId cho UC8
@@ -82,7 +83,9 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
 
   const mine = seats.filter((seat) => seat.status === "HOLDING" && seat.isHeldByMe);
   const soonest = mine.length ? Math.min(...mine.map((seat) => seat.remainingTtl)) : 300;
-  const stale = !matrix.data || matrix.isError || (!demo && now - matrix.dataUpdatedAt > 12000);
+  const bookingRemaining = bookingDeadline === null ? soonest : Math.max(0, Math.floor((bookingDeadline - now) / 1000));
+  const bookable = demo || Boolean(screening.data && new Date(screening.data.startTime).getTime() > now);
+  const stale = !bookable || !matrix.data || matrix.isError || (!demo && now - matrix.dataUpdatedAt > 12000);
   const info = screening.data;
   const movie = info?.movie;
   const total = mine.reduce((sum, seat) => sum + Number(info?.basePrice || 0) * seat.priceMultiplier, 0);
@@ -169,6 +172,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
 
     if (demo) {
       setBookingCode(`CF-DEMO-${crypto.randomUUID().slice(0, 8)}`);
+      setBookingDeadline(now + soonest * 1000);
       setMessage("Khởi tạo đơn hàng thành công (Demo). Sẵn sàng chuyển tới cổng thanh toán Stripe.");
       return;
     }
@@ -184,7 +188,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
       }
 
       // Gửi yêu cầu tạo booking (Backend xử lý Transaction ACID gom các ghế đã hold)
-      const result = await cinemaRequest<{ bookingCode: string }>("/bookings/create", {
+      const result = await cinemaRequest<{ bookingCode: string; holdExpiresAt: string }>("/bookings/create", {
         method: "POST",
         signal: controller.signal,
         body: JSON.stringify({ 
@@ -195,6 +199,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
       });
 
       setBookingCode(result.bookingCode);
+      setBookingDeadline(new Date(result.holdExpiresAt).getTime());
       setMessage("Tạo đơn hàng thành công! Vui lòng hoàn tất thanh toán.");
     } catch (cause) {
       if (!controller.signal.aborted) {
@@ -207,7 +212,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
   }
 
   async function handleStripeCheckout() {
-    if (!bookingCode || busy) return;
+    if (!bookingCode || busy || bookingRemaining <= 0) return;
     if (demo) { setMessage("Chế độ xem thử không tạo giao dịch Stripe. Hãy chọn suất chiếu thực để thanh toán test."); return; }
     setBusy(true);
     setActionError("");
@@ -240,6 +245,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
           </div>
         </div>
 
+        {!demo && screening.data && !bookable && <p role="alert" className={styles.error}>Suất chiếu đã bắt đầu hoặc đã ngừng nhận đặt vé. Vui lòng chọn suất chiếu khác.</p>}
         {demo && <div className={styles.demoNotice}><span>CHẾ ĐỘ XEM THỬ (DEMO)</span> Mô phỏng quy trình Giữ ghế tạm thời (UC7) & Thanh toán đơn hàng (UC8).</div>}
 
         <div className={styles.bookingTitle}>
@@ -308,7 +314,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
               <span><i className={styles.availableSwatch} /> Ghế trống</span>
               <span><i className={styles.vipSwatch} /> Ghế VIP</span>
               <span><i className={styles.mineSwatch} /> Đang chọn</span>
-              <span><i className={styles.heldSwatch} /> Đang giữ (Redis)</span>
+              <span><i className={styles.heldSwatch} /> {demo ? 'Đang giữ (mô phỏng)' : 'Đang giữ (Redis)'}</span>
               <span><i className={styles.bookedSwatch} /> Đã bán</span>
             </div>
           </section>
@@ -349,7 +355,7 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
             {mine.length > 0 && (
               <div className={styles.holdTimer}>
                 <span>Thời gian giữ ghế (TTL):</span>
-                <strong>{countdown(soonest)}</strong>
+                <strong>{countdown(bookingCode ? bookingRemaining : soonest)}</strong>
               </div>
             )}
 
@@ -366,12 +372,13 @@ function SeatScreen({ id, demo, movieId, day }: { id: string; demo: boolean; mov
               <div className={styles.success}>
                 <strong>ĐƠN ĐANG CHỜ THANH TOÁN</strong>
                 <p>Mã đơn hàng: <b>{bookingCode}</b></p>
+                {bookingRemaining <= 0 && <div role="alert"><p>Đơn đã hết thời hạn thanh toán. Ghế đã được giải phóng.</p><button type="button" onClick={() => {setBookingCode(null); setBookingDeadline(null); holdTokensRef.current = {}; void matrix.refetch();}}>Chọn ghế lại</button></div>}
                 <p className="mt-2 text-xs">Thanh toán qua Stripe Test Mode trong thời hạn giữ ghế. Vé được xác nhận sau khi Stripe báo thành công.</p>
                 <button
                   type="button"
                   className={styles.primary}
                   style={{ marginTop: "12px" }}
-                  disabled={busy}
+                  disabled={busy || bookingRemaining <= 0}
                   onClick={handleStripeCheckout}
                 >
                   {busy ? "Đang mở Stripe..." : "Thanh toán qua Stripe Test Mode"}

@@ -1,20 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/components/Toast";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
-    () =>
-      new QueryClient({
+    () => {
+      const client = new QueryClient({
+        mutationCache: new MutationCache({ onSuccess: () => { void client.invalidateQueries(); } }),
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000,
+            staleTime: 0,
             retry: 1,
           },
         },
-      })
+      });
+      return client;
+    }
   );
 
   return (

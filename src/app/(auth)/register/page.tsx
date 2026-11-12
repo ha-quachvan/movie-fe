@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { readApiError } from "@/lib/api";
-import { useRegister, useVerifyEmail } from "@/hooks/useAuth";
+import { useRegister, useVerifyEmail, useResendVerification } from "@/hooks/useAuth";
 import { useToast } from "@/components/Toast";
 import AuthShell from "@/components/AuthShell";
 import EyeIcon from "@/components/EyeIcon";
@@ -26,6 +26,8 @@ export default function RegisterPage() {
   const registerMutation = useRegister();
   const verifyMutation = useVerifyEmail();
   const toast = useToast();
+  const resend = useResendVerification();
+  const consoleDelivery = registerMutation.data?.delivery === "console";
 
   function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -39,9 +41,9 @@ export default function RegisterPage() {
     registerMutation.mutate(
       { email, fullName, password, phoneNumber: phoneNumber || undefined },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           setStep("otp");
-          toast.success("Đã khởi tạo đăng ký", `Mã xác thực đã hiển thị tại Terminal Backend.`);
+          toast.success("Đã khởi tạo đăng ký", data.delivery === "console" ? "Chế độ phát triển: mã xác thực ở log backend." : "Vui lòng kiểm tra email để lấy mã xác thực.");
         },
         onError: (err) => toast.error("Đăng ký thất bại", readApiError(err)),
       }
@@ -63,7 +65,7 @@ export default function RegisterPage() {
         subtitle={
           <>
             Nhập mã OTP đã tạo cho{" "}
-            <strong className="font-medium text-[#1b1b19]">{email}</strong> (xem tại Terminal Backend).
+            <strong className="font-medium text-[#1b1b19]">{email}</strong> {consoleDelivery ? "(chế độ phát triển: xem log backend)." : "(kiểm tra hộp thư email)."}
           </>
         }
         footer={
@@ -81,7 +83,7 @@ export default function RegisterPage() {
       >
         <form onSubmit={handleVerify} className="mt-8 flex flex-col gap-4">
           <p className="rounded-xl border border-[#cfe0d2] bg-[#eef4ef] px-4 py-3 text-sm text-[#4a6b50]">
-            Mã OTP được giả lập hiển thị tại <strong>Terminal Backend</strong>.
+            {consoleDelivery ? "Chế độ phát triển: mã xác thực được ghi vào log backend." : "Mã xác thực đã được gửi tới email đăng ký."} Mã có hiệu lực 10 phút và chỉ dùng một lần.
           </p>
 
           <div className="flex flex-col gap-1.5">
@@ -93,6 +95,8 @@ export default function RegisterPage() {
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="______"
+              pattern="[0-9]{6}"
+              maxLength={6}
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               required
@@ -116,6 +120,10 @@ export default function RegisterPage() {
           >
             {verifyMutation.isPending ? "Đang xác thực..." : "Hoàn tất đăng ký"}
           </button>
+          <button type="button" disabled={resend.isPending} onClick={() => resend.mutate(email, {
+            onSuccess: () => toast.success("Đã yêu cầu mã mới", consoleDelivery ? "Kiểm tra log backend." : "Kiểm tra email đăng ký."),
+            onError: error => toast.error("Không thể gửi mã", readApiError(error)),
+          })}>Gửi lại mã xác thực</button>
         </form>
       </AuthShell>
     );
@@ -207,11 +215,11 @@ export default function RegisterPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              placeholder="Tối thiểu 6 ký tự"
+              placeholder="Tối thiểu 8 ký tự"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
               className={`${fieldClass} pr-12`}
             />
             <button

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Movie, Theater } from "@/lib/mockData";
+import { Movie, Theater, vietnamDay } from "@/lib/catalog";
 
 interface QuickBookingBarProps {
   movies: Movie[];
@@ -19,32 +19,20 @@ export default function QuickBookingBar({ movies, theaters }: QuickBookingBarPro
 
   const [selectedMovieId, setSelectedMovieId] = useState<string>("");
   const [selectedTheaterId, setSelectedTheaterId] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>("today");
+  const [selectedDate, setSelectedDate] = useState<string>(() => vietnamDay());
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<string>("");
+  const [calendarStart] = useState(() => Date.now());
 
   // Dates options (Today, Tomorrow, Day after)
   const dateOptions = useMemo(() => {
-    const today = new Date();
     const dates = [];
-    for (let i = 0; i < 4; i++) {
-      const d = new Date();
-      d.setDate(today.getDate() + i);
-      const dayLabel =
-        i === 0
-          ? "Hôm nay"
-          : i === 1
-          ? "Ngày mai"
-          : `Thứ ${d.getDay() === 0 ? "CN" : d.getDay() + 1}`;
-      const dateString = `${String(d.getDate()).padStart(2, "0")}/${String(
-        d.getMonth() + 1
-      ).padStart(2, "0")}`;
-      dates.push({
-        id: i === 0 ? "today" : `d-${i}`,
-        label: `${dayLabel} (${dateString})`,
-      });
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(calendarStart + i * 86400000);
+      const id = vietnamDay(date);
+      dates.push({ id, label: `${i === 0 ? "Hôm nay" : i === 1 ? "Ngày mai" : "Ngày chiếu"} (${id.slice(8)}/${id.slice(5, 7)})` });
     }
     return dates;
-  }, []);
+  }, [calendarStart]);
 
   // Filter available theaters for selected movie
   const availableTheaters = useMemo(() => {
@@ -60,8 +48,8 @@ export default function QuickBookingBar({ movies, theaters }: QuickBookingBarPro
     const theater = theaters.find((t) => t.id === selectedTheaterId);
     if (!theater) return [];
     const schedule = theater.schedules.find((s) => s.movieId === selectedMovieId);
-    return schedule ? schedule.showtimes : [];
-  }, [theaters, selectedMovieId, selectedTheaterId]);
+    return schedule ? schedule.showtimes.filter(st => vietnamDay(st.startTime) === selectedDate) : [];
+  }, [theaters, selectedMovieId, selectedTheaterId, selectedDate]);
 
   const handleMovieChange = (movieId: string) => {
     setSelectedMovieId(movieId);
@@ -85,7 +73,7 @@ export default function QuickBookingBar({ movies, theaters }: QuickBookingBarPro
   };
 
   const handleBooking = () => {
-    if (!selectedMovieId || !selectedShowtimeId) return;
+    if (!selectedMovieId || !availableShowtimes.some(st => st.id === selectedShowtimeId)) return;
     router.push(
       `/booking/seats?movieId=${selectedMovieId}&theaterId=${selectedTheaterId}&showtimeId=${selectedShowtimeId}&date=${selectedDate}`
     );
@@ -153,7 +141,7 @@ export default function QuickBookingBar({ movies, theaters }: QuickBookingBarPro
             </label>
             <select
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => { setSelectedDate(e.target.value); setSelectedShowtimeId(""); }}
               disabled={!selectedMovieId}
               className="w-full rounded-xl border border-neutral-700/80 bg-neutral-800/90 px-3 py-2.5 text-xs sm:text-sm text-white font-medium focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -196,7 +184,7 @@ export default function QuickBookingBar({ movies, theaters }: QuickBookingBarPro
             <button
               type="button"
               onClick={handleBooking}
-              disabled={!selectedMovieId || !selectedShowtimeId}
+              disabled={!selectedMovieId || !availableShowtimes.some(st => st.id === selectedShowtimeId)}
               className="w-full rounded-xl bg-gradient-to-r from-red-600 to-rose-600 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               Mua Vé Ngay →

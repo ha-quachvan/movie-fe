@@ -28,9 +28,9 @@ export default function ForgotPasswordPage() {
     requestReset.mutate(
       { email },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           setStep("reset");
-          toast.success("Đã gửi mã khôi phục", `Kiểm tra hộp thư ${email}.`);
+          toast.success("Đã yêu cầu mã khôi phục", data.delivery === "console" ? "Chế độ phát triển: kiểm tra log backend." : `Kiểm tra hộp thư ${email}.`);
         },
         onError: (err) => toast.error("Không gửi được mã", readApiError(err)),
       }
@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
       { email, otp: otp.trim(), newPassword },
       {
         onSuccess: () =>
-          toast.success("Đổi mật khẩu thành công", "Bạn đã được đăng nhập."),
+          toast.success("Đổi mật khẩu thành công", "Vui lòng đăng nhập bằng mật khẩu mới."),
         onError: (err) => toast.error("Đặt lại mật khẩu thất bại", readApiError(err)),
       }
     );
@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
         title="Đặt lại mật khẩu"
         subtitle={
           <>
-            Nhập mã đã gửi tới{" "}
+            {requestReset.data?.delivery === "console" ? "Chế độ phát triển: lấy mã từ log backend cho " : "Nhập mã đã gửi tới "}
             <strong className="font-medium text-[#1b1b19]">{email}</strong> và
             mật khẩu mới.
           </>
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
         <form onSubmit={handleReset} className="mt-8 flex flex-col gap-4">
           {requestReset.isSuccess && (
             <p className="rounded-xl border border-[#cfe0d2] bg-[#eef4ef] px-4 py-3 text-sm text-[#4a6b50]">
-              Đã gửi mã khôi phục tới {email}.
+              {requestReset.data?.delivery === "console" ? "Chế độ phát triển: xem mã trong log backend." : `Nếu email hợp lệ, mã khôi phục sẽ được gửi tới ${email}.`} Mã có hiệu lực 10 phút.
             </p>
           )}
 
@@ -87,6 +87,8 @@ export default function ForgotPasswordPage() {
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="______"
+              pattern="[0-9]{6}"
+              maxLength={6}
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               required

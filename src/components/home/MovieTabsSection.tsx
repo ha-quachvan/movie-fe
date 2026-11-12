@@ -5,7 +5,7 @@ import MovieCard from "./MovieCard";
 import MovieSearchInput from "./MovieSearchInput";
 import Link from "next/link";
 import { matchesMovieTitle } from "@/lib/movie-search";
-import { Movie } from "@/lib/mockData";
+import { Movie } from "@/lib/catalog";
 
 interface MovieTabsSectionProps {
   movies: Movie[];
@@ -14,15 +14,7 @@ interface MovieTabsSectionProps {
   onKeywordChange: (keyword: string) => void;
 }
 
-const GENRE_FILTERS = [
-  "Tất Cả",
-  "Hành động",
-  "Khoa học viễn tưởng",
-  "Hoạt hình",
-  "Tâm lý",
-  "Hài",
-  "Phiêu lưu",
-];
+
 
 export default function MovieTabsSection({
   movies,
@@ -33,6 +25,7 @@ export default function MovieTabsSection({
   const [activeTab, setActiveTab] = useState<"now_showing" | "coming_soon">(
     "now_showing"
   );
+  const GENRE_FILTERS = ["Tất Cả", ...new Set(movies.flatMap(movie => movie.genres))];
   const [selectedGenre, setSelectedGenre] = useState<string>("Tất Cả");
 
   const filteredMovies = useMemo(() => {
@@ -107,7 +100,7 @@ export default function MovieTabsSection({
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <MovieSearchInput value={keyword} onChange={onKeywordChange} label="Tìm phim trên trang chủ" />
-        <Link href={`/movies?${new URLSearchParams({ demo: "1", keyword: keyword.trim() })}`} className="pb-3 text-xs font-semibold text-red-400 hover:text-red-300">Bộ lọc nâng cao: rạp, ngày, giá vé ↗</Link>
+        <Link href={`/movies?${new URLSearchParams({ keyword: keyword.trim() })}`} className="pb-3 text-xs font-semibold text-red-400 hover:text-red-300">Bộ lọc nâng cao: rạp, ngày, giá vé ↗</Link>
       </div>
       <p role="status" className="mt-3 text-xs text-neutral-400">{keyword.trim() ? `Tìm thấy ${filteredMovies.length} phim trong tab đang chọn cho “${keyword.trim()}”.` : "Tìm theo tên phim hoặc tên gốc, có thể nhập không dấu."}</p>
 

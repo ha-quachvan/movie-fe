@@ -17,11 +17,28 @@ try {
     '/api/cinemas/1': { data: { id: 1, name: 'Test Cinema' } },
     '/api/cinemas/1/rooms': { data: [{ id: 2, name: 'Room 2' }] },
     '/api/seats/room/2': { data: [{ id: 3, label: 'A1', row: 'A', column: 1, type: 'VIP', priceCoefficient: '1.5', status: 'AVAILABLE' }] },
+    '/api/genres': { data: [{id: 17, name: 'Test genre from database'}] },
+    '/api/search/movies': { data: {items: [{id: 42, title: 'Database movie', showtimes: [{id: 101}]}]} },
+    '/api/seats/3': { data: {id: 3, row: 'B', column: 2, seatNumber: 'B2'} },
+    '/api/auth/forgot-password': { data: {message: 'Requested', delivery: 'console'} },
+    '/api/auth/reset-password': { data: {message: 'Password reset'} },
   };
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(input);
     assert.ok(routes[url.pathname], `Unexpected endpoint: ${url.pathname}`);
     if (url.pathname === '/api/users/me') assert.equal(new Headers(init.headers).get('Authorization'), 'Bearer test-token');
+    if (url.pathname === '/api/search/movies') {
+      assert.equal(url.searchParams.get('date'), '2026-12-01');
+      assert.equal(url.searchParams.get('cinemaId'), '9');
+      assert.equal(url.searchParams.get('minPrice'), '50000');
+      assert.equal(url.searchParams.get('maxPrice'), '150000');
+    }
+    if (url.pathname === '/api/seats/3') { assert.equal(init.method, 'PATCH'); assert.deepEqual(JSON.parse(init.body), {row: 'B', column: 2, seatNumber: 'B2'}); }
+    if (url.pathname === '/api/auth/forgot-password') assert.equal(init.method, 'POST');
+    if (url.pathname === '/api/auth/reset-password') {
+      assert.equal(init.method, 'PUT');
+      assert.deepEqual(JSON.parse(init.body), {email: 'test@example.com', otp: '123456', newPassword: 'Changed@123'});
+    }
     return Response.json({ statusCode: 200, success: true, ...routes[url.pathname] });
   };
   storage.set('refreshToken', 'stale-refresh-token');
@@ -42,6 +59,13 @@ try {
   assert.equal(api.getCurrentUser(), null);
   assert.equal(api.getAccessToken(), null); checks++;
   assert.equal('updateProfile' in api, false); checks++;
+  assert.equal((await api.getGenres())[0].id, 17); checks++;
+  const searched = await api.searchMovies({date: '2026-12-01', cinemaId: '9', minPrice: '50000', maxPrice: '150000'});
+  assert.equal(searched[0].id, 42); assert.equal(searched[0].showtimes[0].id, 101); checks++;
+  assert.equal((await api.updateSeat(3, {row: 'B', column: 2, seatNumber: 'B2'})).seatNumber, 'B2'); checks++;
+  assert.equal((await api.requestPasswordReset('test@example.com')).delivery, 'console'); checks++;
+  await api.resetPassword('test@example.com', '123456', 'Changed@123');
+  assert.equal(api.getAccessToken(), null); checks++;
   console.log(`API contract checks: ${checks} passed`);
   if (process.argv.includes('--live')) {
     globalThis.fetch = realFetch;

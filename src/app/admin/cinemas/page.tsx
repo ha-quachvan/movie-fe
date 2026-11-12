@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getCinemas,
@@ -18,6 +18,8 @@ import {
   UpdateRoomPayload,
   SeatConfig,
   readApiError,
+  getSeatTypes,
+  getSeatsByRoom,
 } from "@/lib/api";
 import Link from "next/link";
 import AdminNav from "@/components/admin/AdminNav";
@@ -26,6 +28,11 @@ const CITIES = ["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Cần Thơ", 
 
 export default function AdminCinemasPage() {
   const queryClient = useQueryClient();
+  const {data: seatTypes = []} = useQuery({queryKey: ["seat-types"], queryFn: getSeatTypes});
+  const roomLoad = useRef(0);
+  const [roomSeatsLoading, setRoomSeatsLoading] = useState(false);
+  const [roomConfigReady, setRoomConfigReady] = useState(true);
+  const [initialCounts, setInitialCounts] = useState([0, 0, 0]);
 
   // State Tìm kiếm & Lọc
   const [searchTerm, setSearchTerm] = useState("");
@@ -45,7 +52,7 @@ export default function AdminCinemasPage() {
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [roomName, setRoomName] = useState("");
 
-  // State cấu hình chi tiết các loại ghế (ID 1: Thường, ID 2: VIP, ID 3: Sweetbox)
+  // Counts are form input; type IDs and existing counts are loaded from MySQL.
   const [standardSeats, setStandardSeats] = useState<number>(60);
   const [vipSeats, setVipSeats] = useState<number>(30);
   const [sweetboxSeats, setSweetboxSeats] = useState<number>(6);
@@ -191,6 +198,9 @@ export default function AdminCinemasPage() {
   };
 
   const resetRoomForm = () => {
+    roomLoad.current += 1;
+    setRoomSeatsLoading(false);
+    setRoomConfigReady(true);
     setEditingRoom(null);
     setRoomName("");
     setStandardSeats(60);
@@ -199,20 +209,21 @@ export default function AdminCinemasPage() {
     setRoomFormError("");
   };
 
-  const handleEditRoomClick = (room: Room) => {
-    setEditingRoom(room);
-    setRoomName(room.name);
-
-    const total = room.totalSeats ?? room.capacity ?? 96;
-    setStandardSeats(Math.round(total * 0.6));
-    setVipSeats(Math.round(total * 0.3));
-    setSweetboxSeats(total - Math.round(total * 0.6) - Math.round(total * 0.3));
-    setRoomFormError("");
+  const handleEditRoomClick = async (room: Room) => {
+    const version = ++roomLoad.current;
+    setEditingRoom(room); setRoomName(room.name); setRoomFormError(""); setRoomSeatsLoading(true); setRoomConfigReady(false);
+    try {
+      const seats = (await getSeatsByRoom(room.id)).filter(seat => seat.status !== "INACTIVE");
+      if (roomLoad.current !== version) return;
+      const counts = ["REGULAR", "VIP", "COUPLE"].map(type => seats.filter(seat => seat.type === type).length);
+      setStandardSeats(counts[0]); setVipSeats(counts[1]); setSweetboxSeats(counts[2]); setInitialCounts(counts); setRoomConfigReady(true);
+    } catch (error) { if (roomLoad.current === version) setRoomFormError(readApiError(error, "Không thể tải cấu hình ghế.")); }
+    finally { if (roomLoad.current === version) setRoomSeatsLoading(false); }
   };
 
   const handleRoomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCinemaForRooms) return;
+    if (!activeCinemaForRooms || roomSeatsLoading || !roomConfigReady) return;
     setRoomFormError("");
 
     if (!roomName.trim()) {
@@ -231,17 +242,19 @@ export default function AdminCinemasPage() {
     }
 
     const seatConfigurations: SeatConfig[] = [];
-    if (std > 0) seatConfigurations.push({ seatTypeId: 1, totalSeats: std });
-    if (vip > 0) seatConfigurations.push({ seatTypeId: 2, totalSeats: vip });
-    if (sweet > 0) seatConfigurations.push({ seatTypeId: 3, totalSeats: sweet });
+    for (const [name, count] of [["REGULAR", std], ["VIP", vip], ["COUPLE", sweet]] as const) {
+      if (count <= 0) continue;
+      const type = seatTypes.find(type => type.name === name);
+      if (!type) { setRoomFormError("Chưa tải được loại ghế từ hệ thống. Vui lòng thử lại."); return; }
+      seatConfigurations.push({seatTypeId: type.id, totalSeats: count});
+    }
 
     if (editingRoom) {
       updateRoomMutation.mutate({
         id: editingRoom.id,
         payload: {
           name: roomName,
-          totalSeats: total,
-          seatConfigurations,
+          ...([std, vip, sweet].some((count, index) => count !== initialCounts[index]) ? {totalSeats: total, seatConfigurations} : {}),
         },
       });
     } else {
@@ -593,7 +606,7 @@ export default function AdminCinemasPage() {
                   )}
                   <button
                     type="submit"
-                    disabled={createRoomMutation.isPending || updateRoomMutation.isPending}
+                    disabled={!roomConfigReady || roomSeatsLoading || createRoomMutation.isPending || updateRoomMutation.isPending}
                     style={{ padding: "9px 20px", background: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "600", cursor: "pointer", fontSize: "13px" }}
                   >
                     {createRoomMutation.isPending || updateRoomMutation.isPending ? "Đang lưu..." : editingRoom ? "Cập nhật cấu hình" : "Thêm phòng"}

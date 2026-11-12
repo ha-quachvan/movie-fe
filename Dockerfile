@@ -10,7 +10,7 @@ RUN npm ci
 # Copy source
 COPY . .
 
-EXPOSE 3000
+EXPOSE 3001
 
 # docker-compose override command thành "npm run dev".
 # Khi build production: dùng "npm run build" + "npm start".

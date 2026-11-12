@@ -8,6 +8,7 @@ import {
   verifyEmail,
   requestPasswordReset,
   resetPassword,
+  resendVerification,
 } from "@/lib/api";
 
 export function useLogin() {
@@ -50,4 +51,7 @@ export function useResetPassword() {
       resetPassword(vars.email, vars.otp, vars.newPassword),
     onSuccess: () => router.push("/login"),
   });
+}
+export function useResendVerification() {
+  return useMutation({ mutationFn: (email: string) => resendVerification(email) });
 }

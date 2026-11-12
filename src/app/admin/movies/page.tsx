@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getMovies,
+  getGenres,
   createMovie,
   updateMovie,
   deleteMovie,
@@ -17,24 +18,11 @@ import {
 import Link from "next/link";
 import AdminNav from "@/components/admin/AdminNav";
 
-const GENRE_OPTIONS = [
-  { id: 1, name: "Khoa học viễn tưởng" },
-  { id: 2, name: "Phiêu lưu" },
-  { id: 3, name: "Tiểu sử" },
-  { id: 4, name: "Lịch sử" },
-  { id: 5, name: "Chính kịch" },
-  { id: 6, name: "Hành động" },
-  { id: 7, name: "Hài hước" },
-  { id: 8, name: "Siêu anh hùng" },
-  { id: 9, name: "Quái thú" },
-  { id: 10, name: "Giả tưởng" },
-  { id: 11, name: "Hoạt hình" },
-  { id: 12, name: "Gia đình" },
-  { id: 13, name: "Giật gân" },
-];
+
 
 export default function AdminMoviesPage() {
   const queryClient = useQueryClient();
+  const { data: GENRE_OPTIONS = [] } = useQuery({ queryKey: ["genres"], queryFn: getGenres });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
   const [formError, setFormError] = useState("");

@@ -9,6 +9,8 @@ import {
   getSeatsByRoom,
   generateSeatsGrid,
   createSeat,
+  updateSeat,
+  type CreateSeatPayload,
   deleteSeat,
   Room,
   Seat,
@@ -35,6 +37,7 @@ function SeatsManagerContent() {
   // Modal states
   const [isGridModalOpen, setIsGridModalOpen] = useState(false);
   const [isCreateSeatModalOpen, setIsCreateSeatModalOpen] = useState(false);
+  const [editingSeat, setEditingSeat] = useState<Seat | null>(null);
   const [selectedSeatDetail, setSelectedSeatDetail] = useState<Seat | null>(null);
 
   // Form states cho Generate Grid
@@ -95,10 +98,12 @@ function SeatsManagerContent() {
 
   // 4. Mutation: Thêm ghế đơn lẻ
   const createSeatMutation = useMutation({
-    mutationFn: createSeat,
+    mutationFn: (payload: CreateSeatPayload) => editingSeat
+      ? updateSeat(editingSeat.id, {row: payload.row, column: payload.column, seatNumber: payload.seatNumber, type: payload.type})
+      : createSeat(payload),
     onSuccess: () => {
       setIsCreateSeatModalOpen(false);
-      setFeedbackMessage({ text: "Đã thêm ghế đơn lẻ thành công!", type: "success" });
+      setFeedbackMessage({ text: editingSeat ? "Đã cập nhật ghế thành công!" : "Đã thêm ghế đơn lẻ thành công!", type: "success" });
       queryClient.invalidateQueries({ queryKey: ["admin-room-seats", selectedRoomId] });
       void refetchSeats();
     },
@@ -203,7 +208,6 @@ function SeatsManagerContent() {
       column: Number(singleColumn),
       seatNumber: singleSeatNumber.trim().toUpperCase(),
       type: singleType,
-      priceMultiplier: singleType === "VIP" ? 1.2 : singleType === "COUPLE" ? 1.5 : 1.0,
     });
   };
 
@@ -232,6 +236,7 @@ function SeatsManagerContent() {
           <button
             type="button"
             onClick={() => {
+              setEditingSeat(null);
               setSingleRow("A");
               setSingleColumn(1);
               setSingleSeatNumber("A1");
@@ -710,7 +715,7 @@ function SeatsManagerContent() {
           <div style={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "14px", width: "100%", maxWidth: "460px", padding: "28px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#fff", margin: 0 }}>
-                Thêm Ghế Đơn Lẻ
+                {editingSeat ? "Cập nhật ghế" : "Thêm Ghế Đơn Lẻ"}
               </h2>
               <button onClick={() => setIsCreateSeatModalOpen(false)} style={{ background: "transparent", border: "none", color: "#a1a1aa", fontSize: "20px", cursor: "pointer" }}>✕</button>
             </div>
@@ -812,7 +817,7 @@ function SeatsManagerContent() {
                     cursor: createSeatMutation.isPending ? "not-allowed" : "pointer",
                   }}
                 >
-                  {createSeatMutation.isPending ? "Đang lưu..." : "Lưu Ghế"}
+                  {createSeatMutation.isPending ? "Đang lưu..." : editingSeat ? "Cập nhật ghế" : "Lưu Ghế"}
                 </button>
               </div>
             </form>
@@ -853,6 +858,12 @@ function SeatsManagerContent() {
               </div>
             </div>
 
+            <p style={{fontSize: 12, marginBottom: 12}}>Chỉ sửa vị trí hoặc loại ghế trước khi phòng mở lịch bán vé và trước khi ghế có lịch sử vé.</p>
+            <button type="button" onClick={() => {
+              setEditingSeat(selectedSeatDetail); setSingleRow(selectedSeatDetail.row); setSingleColumn(selectedSeatDetail.column);
+              setSingleSeatNumber(selectedSeatDetail.seatNumber); setSingleType(selectedSeatDetail.type);
+              setSingleFormError(""); setSelectedSeatDetail(null); setIsCreateSeatModalOpen(true);
+            }} style={{padding: 10, marginBottom: 12}}>Chỉnh sửa ghế</button>
             <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
               <button
                 type="button"

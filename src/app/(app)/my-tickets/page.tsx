@@ -48,6 +48,7 @@ export default function MyTicketsPage() {
   } = useQuery({
     queryKey: ["my-tickets"],
     queryFn: getMyBookings,
+    refetchInterval: 15000,
   });
 
   // Mutation hủy vé & hoàn tiền
@@ -55,7 +56,7 @@ export default function MyTicketsPage() {
     mutationFn: (bookingCode: string) => cancelAndRefundTicket(bookingCode),
     onSuccess: (data) => {
       setToast({
-        message: `Hủy vé ${data.bookingCode} thành công. Kiểm tra trạng thái hoàn tiền trong chi tiết vé.`,
+        message: data.refundAmount === 0 ? `Đã hủy đơn chưa thanh toán ${data.bookingCode}.` : `Hủy vé ${data.bookingCode} thành công. Kiểm tra trạng thái hoàn tiền trong chi tiết vé.`,
         type: "success",
       });
       setBookingToCancel(null);
@@ -109,7 +110,7 @@ export default function MyTicketsPage() {
   const checkCancellationEligibility = (booking: BookingDetail) => {
     const minutesLeft = getMinutesUntilShowtime(booking.showtime?.startTime);
     const isConfirmed = booking.status === "CONFIRMED";
-    const canCancel = isConfirmed && minutesLeft >= 60;
+    const canCancel = (isConfirmed && minutesLeft >= 60) || (booking.status === 'PENDING' && Boolean(booking.holdExpiresAt) && new Date(booking.holdExpiresAt!).getTime() > now);
     return { canCancel, minutesLeft };
   };
 
@@ -669,7 +670,7 @@ export default function MyTicketsPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#e4e4e7" }}>
                           <span>🏢</span>
                           <strong>{cinema?.name || "Rạp CineBook"}</strong>
-                          <span style={{ color: "#71717a" }}>({room?.roomName || "Phòng Standard"})</span>
+                          <span style={{ color: "#71717a" }}>({room?.name || "Phòng Standard"})</span>
                         </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#facc15" }}>
@@ -881,7 +882,7 @@ export default function MyTicketsPage() {
                         {selectedBookingForDetail.showtime?.movie?.title || "Phim Chiếu Rạp"}
                       </h2>
                       <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af" }}>
-                        {selectedBookingForDetail.showtime?.room?.cinema?.name} • {selectedBookingForDetail.showtime?.room?.roomName}
+                        {selectedBookingForDetail.showtime?.room?.cinema?.name} • {selectedBookingForDetail.showtime?.room?.name}
                       </p>
                     </div>
 

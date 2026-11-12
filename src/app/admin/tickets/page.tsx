@@ -33,7 +33,7 @@ export default function AdminTicketsPage() {
     mutationFn: (code: string) => cancelAndRefundTicket(code),
     onSuccess: (data) => {
       setToast({
-        message: `Đã hủy vé ${data.bookingCode} thành công và kích hoạt hoàn tiền!`,
+        message: data.refundAmount === 0 ? `Đã hủy đơn chưa thanh toán ${data.bookingCode}.` : `Đã hủy vé ${data.bookingCode}. Kiểm tra trạng thái hoàn tiền trong chi tiết vé.`,
         type: "success",
       });
       setConfirmCancel(false);
@@ -299,7 +299,7 @@ export default function AdminTicketsPage() {
                     {booking.showtime?.movie?.title || "Phim"}
                   </p>
                   <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#a1a1aa" }}>
-                    🏢 {booking.showtime?.room?.cinema?.name} - {booking.showtime?.room?.roomName}
+                    🏢 {booking.showtime?.room?.cinema?.name} - {booking.showtime?.room?.name}
                   </p>
                   <p style={{ margin: 0, fontSize: "13px", color: "#facc15" }}>
                     📅 Khởi chiếu: {formatDateTime(booking.showtime?.startTime)}

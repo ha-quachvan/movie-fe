@@ -12,14 +12,14 @@ Giao diện web của **app cho phim** — quản lý rạp phim, đặt vé và
 | UI | React 19, Tailwind CSS v4 |
 | Data fetching / cache | TanStack Query v5 |
 | Ngôn ngữ | TypeScript 5 |
-| Font | Be Vietnam Pro, Geist (next/font) |
+| Font | Be Vietnam Pro, Geist (Fontsource) |
 
 ---
 
 ## Yêu cầu
 
-- **Node.js >= 20** (đã test trên 22) và **npm >= 10**
-- Backend đang chạy (mặc định tại `http://localhost:8000`)
+- **Node.js >= 20.9** (đã kiểm thử trên Node.js 24 LTS) và **npm >= 10**
+- Backend đang chạy (mặc định tại `http://localhost:3000`)
 
 > Chi tiết thư viện xem [`DEPENDENCIES.md`](./DEPENDENCIES.md) hoặc nguồn chính [`package.json`](./package.json).
 
@@ -29,11 +29,12 @@ Giao diện web của **app cho phim** — quản lý rạp phim, đặt vé và
 
 ```bash
 # 1. Cài dependencies
-npm install
+npm ci
 
-# 2. Tạo file môi trường .env (xem mục Biến môi trường bên dưới)
+# 2. Tạo cấu hình nếu chưa có (xem mục Biến môi trường bên dưới)
+test -f .env.local || cp .env.example .env.local
 
-# 3. Chạy dev (http://localhost:3000)
+# 3. Chạy dev (http://localhost:3001)
 npm run dev
 ```
 
@@ -50,11 +51,11 @@ npm run dev
 
 ## Biến môi trường
 
-Tạo file `.env` (hoặc `.env.local`) ở thư mục `frontend`:
+Tạo file `.env.local` ở thư mục gốc repo `movie-fe`:
 
 ```env
 # URL gốc của backend NestJS. Tiền tố NEXT_PUBLIC_ để client đọc được.
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
 
 ---
@@ -120,7 +121,7 @@ src/
 - **useProfile**: Fetch profile người dùng hiện tại, cập nhật thông tin
 
 #### `src/lib/api.ts`
-- **apiFetch**: Wrapper `fetch()` với tự động thêm Authorization header, refresh token
+- **apiFetch**: Wrapper `fetch()` tự thêm Authorization header; xóa phiên khi API trả 401 để người dùng đăng nhập lại
 - **login/register/verifyEmail**: Các hàm xác thực
 - **getProfile/updateProfile**: Quản lý người dùng
 - **Token management**: `getAccessToken()`, `setTokens()`, `clearTokens()`
@@ -154,4 +155,34 @@ UI cập nhật (Toast, redirect, refetch)
 
 | Biến | Mô tả | Mặc định |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `http://localhost:8000` |
+| `NEXT_PUBLIC_API_URL` | Backend API URL | `http://localhost:3000` |
+
+
+## Đồng bộ dữ liệu và kiểm thử tích hợp
+
+Backend chạy cổng 3000, frontend mặc định cổng 3001. Chỉ cần `NEXT_PUBLIC_API_URL` trong `.env.local` (xem `.env.example`); mọi màn hình dùng cùng URL. Biến này được đóng vào bundle khi build nên cần build lại sau khi đổi. Không đưa khóa Stripe/email vào biến NEXT_PUBLIC_.
+
+Trang chủ, danh sách/chi tiết phim và lịch chiếu lấy dữ liệu từ backend. Bộ lọc rạp/ngày/giá gọi API tìm kiếm. Mọi ID phim/suất chiếu trong luồng mặc định là ID MySQL; giữ ghế gọi Redis qua backend, booking và lịch sử vé dùng MySQL. Danh sách thể loại quản trị lấy từ DB. Chế độ xem thử chỉ bật rõ ràng tại `/movies?demo=1` và các liên kết có `demo=1`, không tạo booking/thanh toán thật. Khuyến mãi chưa có API được hiển thị là chưa có chương trình, không công bố mã giảm giá mẫu.
+
+Trước khi kiểm thử, chạy seed backend để có suất chiếu tương lai và tài khoản phát triển. Seed không đặt lại mật khẩu tài khoản đã tồn tại. Cấu hình email/OTP và Stripe test theo `BTL_DBMS_BE/INTEGRATION.md`; frontend hiển thị rõ email đang dùng console trong môi trường phát triển và yêu cầu đăng nhập lại sau khi đổi mật khẩu.
+
+Font được đóng kèm từ các gói Fontsource, không tải Google Fonts khi build. Các ảnh poster lấy từ dữ liệu backend; cần quyền mạng tới miền ảnh được sử dụng để xem ảnh đầy đủ.
+
+```bash
+npm run lint
+npm run test:api
+node scripts/test-api.mjs --live
+npm run build
+npm run start
+```
+
+Trong terminal khác, khi backend và frontend đã chạy:
+
+```bash
+npx playwright install chromium  # lần đầu, nếu chưa có browser
+npm run test:e2e
+# Hoặc dùng Chromium đã có trong môi trường Linux:
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
+```
+
+Playwright kiểm tra catalog/API thật, bộ lọc, liên kết lịch chiếu, sơ đồ ghế, giữ/hủy ghế Redis, tách demo và API quản trị. Mặc định dùng hai tài khoản seed phát triển được mô tả ở backend; có thể đặt `E2E_CUSTOMER_EMAIL`, `E2E_CUSTOMER_PASSWORD`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD` qua môi trường kiểm thử. Đặt `E2E_BASE_URL` và `E2E_API_URL` nếu đổi cổng. Kiểm thử UI không thu tiền hoặc tạo booking thật; kiểm thử transaction/booking/thanh toán mô phỏng/hoàn tiền nằm ở backend. Stripe Checkout thực cần cấu hình và kiểm tra riêng.

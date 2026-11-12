@@ -3,62 +3,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { getMovies, Movie as BackendMovie } from "@/lib/api";
+import { searchMovies, getCinemas, getGenres } from "@/lib/api";
 import { MOVIES, THEATERS } from "@/lib/mockData";
-import { emptyFilters, timeLabel, price, type CinemaMovie, type CinemaShowtime,type Filters } from "@/components/cinema/cinema-api";
+import { normalizeMovie, emptyFilters, timeLabel, price, type CinemaMovie, type Filters } from "@/components/cinema/cinema-api";
 import { demoCatalog } from "@/components/cinema/demo-data";
 import { useIsAdmin } from "@/hooks/useClientState";
 import Poster from "@/components/cinema/Poster";
 import styles from "@/components/cinema/cinema.module.css";
-
-// Adapter map dữ liệu từ Backend NestJS, đồng thời tạo suất chiếu dùng được với sơ đồ ghế demo
-function adaptBackendToCinemaMovie(m: BackendMovie): CinemaMovie {
-  // Tìm xem bộ phim từ Backend có khớp với dữ liệu Demo trong mockData hay không
-  const matchedDemoMovie = MOVIES.find(
-    (demo) => String(demo.id) === String(m.id) || demo.title.toLowerCase() === m.title.toLowerCase()
-  );
-
-  let demoShowtimes: CinemaShowtime[] = [];
-
-  // NẾU LÀ PHIM CÓ TRONG DEMO: Lấy suất chiếu từ mockData
-  if (matchedDemoMovie) {
-    const today = new Date().toISOString().split("T")[0];
-    demoShowtimes = THEATERS.flatMap((theater) =>
-      theater.schedules
-        .filter((schedule) => schedule.movieId === matchedDemoMovie.id)
-        .flatMap((schedule) =>
-          schedule.showtimes.map((st) => ({
-            id: st.id,
-            startTime: `${today}T${st.time}:00+07:00`,
-            basePrice: st.price,
-            room: {
-              id: st.room,
-              name: st.room,
-              cinema: { id: theater.id, name: theater.name },
-            },
-          }))
-        )
-    );
-  }
-
-  // NẾU KHÔNG CÓ TRONG DEMO: showtimes sẽ là [] rỗng (Giao diện sẽ báo "Lịch chiếu sẽ sớm được cập nhật.")
-  return {
-    id: String(m.id),
-    title: m.title,
-    description: m.description || "",
-    durationMinutes: m.durationMinutes,
-    releaseDate: m.releaseDate ? m.releaseDate.substring(0, 10) : "",
-    genres: m.genres || [],
-    ageRating: m.ageRating || "P",
-    director: m.director || "",
-    cast: m.cast || "",
-    posterUrl: m.posterUrl || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=800&auto=format&fit=crop",
-    trailerUrl: m.trailerUrl || "",
-    status: m.status,
-    rating: Number(m.rating) || 0,
-    showtimes: demoShowtimes,
-  } as CinemaMovie;
-}
 
 function FilmCard({ movie, demo, day }: { movie: CinemaMovie; demo: boolean; day: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -67,7 +18,7 @@ function FilmCard({ movie, demo, day }: { movie: CinemaMovie; demo: boolean; day
   return (
     <article className={styles.film}>
       {/* Click vào Poster chuyển sang trang chi tiết */}
-      <Link href={`/movies/${movie.id}`} className={styles.posterWrap}>
+      <Link href={`/movies/${movie.id}${demo ? "?demo=1" : ""}`} className={styles.posterWrap}>
         <Poster src={movie.posterUrl} title={movie.title} className={styles.poster} />
         <div className={styles.posterBadges}>
           <span className={styles.age}>{movie.ageRating || "PHIM"}</span>
@@ -84,7 +35,7 @@ function FilmCard({ movie, demo, day }: { movie: CinemaMovie; demo: boolean; day
         
         {/* Click vào Tiêu đề chuyển sang trang chi tiết */}
         <h2>
-          <Link href={`/movies/${movie.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+          <Link href={`/movies/${movie.id}${demo ? "?demo=1" : ""}`} style={{ color: "inherit", textDecoration: "none" }}>
             {movie.title}
           </Link>
         </h2>
@@ -107,7 +58,8 @@ function FilmCard({ movie, demo, day }: { movie: CinemaMovie; demo: boolean; day
               showtimeId: String(showtime.id),
               movieId: String(movie.id),
             });
-            if (demo || !demo) {
+            if (demo) {
+              params.set("demo", "1");
               params.set("date", day || showtime.startTime.slice(0, 10));
             }
             return (
@@ -148,17 +100,7 @@ export default function MovieExplorer() {
     queryKey: ["cinema-movies", demo, applied],
     queryFn: async () => {
       if (demo) return demoCatalog(applied);
-      const rawMovies = await getMovies();
-      let result = rawMovies.map(adaptBackendToCinemaMovie);
-
-      if (applied.keyword) {
-        const kw = applied.keyword.toLowerCase();
-        result = result.filter((m) => m.title.toLowerCase().includes(kw));
-      }
-      if (applied.genre) {
-        result = result.filter((m) => m.genres?.some((g) => g.name === applied.genre));
-      }
-      return result;
+      return (await searchMovies(applied)).map(normalizeMovie);
     },
   });
 
@@ -166,26 +108,10 @@ export default function MovieExplorer() {
     .filter((movie) => !movie.status || movie.status === status)
     .sort((a, b) => (sort === "rating" ? Number(b.rating || 0) - Number(a.rating || 0) : a.title.localeCompare(b.title, "vi")));
 
-  const genres = [
-    ...new Set([
-      ...MOVIES.flatMap((movie) => movie.genres),
-      ...(query.data || []).flatMap((movie) => movie.genres?.map((genre) => genre.name) || []),
-    ]),
-  ];
-
-  const cinemas = demo
-    ? THEATERS.map((item) => ({ id: item.id, name: item.name }))
-    : [
-        ...new Map(
-          (query.data || [])
-            .flatMap((movie) => movie.showtimes || [])
-            .flatMap((item) =>
-              item.room?.cinema?.id
-                ? ([[String(item.room.cinema.id), { id: String(item.room.cinema.id), name: item.room.cinema.name || "Rạp chiếu" }]] as const)
-                : []
-            )
-        ).values(),
-      ];
+  const genreQuery = useQuery({ queryKey: ["genres"], queryFn: getGenres, enabled: !demo });
+  const cinemaQuery = useQuery({ queryKey: ["public-cinemas"], queryFn: getCinemas, enabled: !demo });
+  const genres = demo ? [...new Set(MOVIES.flatMap(m => m.genres))] : (genreQuery.data || []).map(g => g.name);
+  const cinemas = demo ? THEATERS : (cinemaQuery.data || []);
 
   function update(key: keyof Filters, value: string) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -202,7 +128,7 @@ export default function MovieExplorer() {
       <section
         className={styles.hero}
         style={{
-          backgroundImage: `linear-gradient(90deg,#100d11 10%,#100d11b0 65%,#100d1140),linear-gradient(0deg,#100d11,transparent),url('${MOVIES[0].backdropUrl}')`,
+          backgroundImage: `linear-gradient(90deg,#100d11 10%,#100d11b0 65%,#100d1140),linear-gradient(0deg,#100d11,transparent),url('/poster-placeholder.svg')`,
         }}
       >
         <div className={styles.container}>

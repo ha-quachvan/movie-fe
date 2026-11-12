@@ -1,6 +1,6 @@
-import { getAccessToken } from "@/lib/api";
+import { getAccessToken, clearTokens, API_BASE, type Movie } from "@/lib/api";
 
-const CINEMA_API = (process.env.NEXT_PUBLIC_CINEMA_API_URL || "http://localhost:3000/api").replace(/\/$/, "");
+const CINEMA_API = `${API_BASE}/api`;
 
 export type CinemaShowtime = {
   id: string | number; 
@@ -57,11 +57,19 @@ export async function cinemaRequest<T>(path: string, options: RequestInit = {}):
     signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout 
   });
   const body = await response.json().catch(() => null);
+  if (response.status === 401) clearTokens();
   if (!response.ok || body?.success === false) {
     const message = response.status === 401 ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." : body?.message;
     throw new Error(Array.isArray(message) ? message.join(". ") : message || "Chưa kết nối được dữ liệu rạp phim. Vui lòng thử lại.");
   }
   return (body?.data ?? body) as T;
+}
+
+export function normalizeMovie(movie: Movie): CinemaMovie {
+  return { ...movie, rating: Number(movie.rating), description: movie.description ?? undefined,
+    posterUrl: movie.posterUrl || "/poster-placeholder.svg", ageRating: movie.ageRating ?? undefined,
+    releaseDate: movie.releaseDate ?? undefined, director: movie.director ?? undefined,
+    cast: movie.cast ?? undefined, trailerUrl: movie.trailerUrl ?? undefined };
 }
 
 export const price = (value: number | string) => `${Number(value).toLocaleString("vi-VN")}đ`;

@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000").replace(/\/+$/, "").replace(/\/api$/, "");
 const AUTH = `${API_BASE}/api/auth`;
 
 const ACCESS_KEY = "accessToken";
@@ -57,39 +57,9 @@ class ApiError extends Error {
   }
 }
 
-let refreshPromise: Promise<string> | null = null;
-
-export async function refreshAccessToken(): Promise<string> {
-  const refresh = getRefreshToken();
-  if (!refresh) throw new ApiError(401, { detail: "Thiếu refresh token" });
-
-  if (!refreshPromise) {
-    refreshPromise = (async () => {
-      const res = await fetch(`${AUTH}/refresh-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh }),
-      });
-      if (!res.ok) {
-        clearTokens();
-        throw new ApiError(res.status, await res.json().catch(() => null));
-      }
-      const data = await res.json();
-      const newAccess = data.accessToken || data.access;
-      const newRefresh = data.refreshToken || data.refresh;
-      setTokens(newAccess, newRefresh);
-      return newAccess as string;
-    })().finally(() => {
-      refreshPromise = null;
-    });
-  }
-  return refreshPromise;
-}
-
 export async function apiFetch<T = unknown>(
   path: string,
-  options: RequestInit = {},
-  retryOn401 = true
+  options: RequestInit = {}
 ): Promise<T> {
   const token = getAccessToken();
   const headers = new Headers(options.headers);
@@ -101,15 +71,10 @@ export async function apiFetch<T = unknown>(
   
   const url = `${API_BASE}/api/${cleanPath}`;
 
-  const res = await fetch(url, { ...options, headers });
+  const timeout = AbortSignal.timeout(15000);
+  const res = await fetch(url, { ...options, headers, signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout });
 
-  if (res.status === 401 && retryOn401 && getRefreshToken()) {
-    try {
-      await refreshAccessToken();
-      return apiFetch<T>(path, options, false);
-    } catch {
-    }
-  }
+  if (res.status === 401 && token) clearTokens();
 
   const isJson = res.headers.get("content-type")?.includes("application/json");
   const data = isJson ? await res.json() : await res.text();
@@ -180,7 +145,7 @@ async function authPost<T = unknown>(
   const isJson = res.headers.get("content-type")?.includes("application/json");
   const data = isJson ? await res.json() : await res.text();
   if (!res.ok) throw new ApiError(res.status, data);
-  return data as T;
+  return unwrapData<T>(data);
 }
 
 export async function register(
@@ -188,7 +153,7 @@ export async function register(
   fullName: string,
   password: string,
   phoneNumber?: string
-): Promise<{ message?: string }> {
+): Promise<{ message?: string; delivery?: string }> {
   return authPost("register", { email, fullName, password, phoneNumber });
 }
 
@@ -201,23 +166,18 @@ export async function verifyEmail(
 
 export async function requestPasswordReset(
   email: string
-): Promise<{ message?: string }> {
-  return authPost("resend-otp", { email });
+): Promise<{ message?: string; delivery?: string }> {
+  return authPost("forgot-password", { email });
 }
 
-export async function resetPassword(
-  email: string,
-  otp: string,
-  newPassword: string
-): Promise<LoginResponse> {
-  const data = await authPost<LoginResponse>(
-    "reset-password",
-    { email, otp, new_password: newPassword },
-    "PUT"
-  );
-  const token = data.accessToken || data.access;
-  if (token) setTokens(token, data.refresh);
-  return data;
+export async function resetPassword(email: string, otp: string, newPassword: string): Promise<{message?: string}> {
+  const result = await authPost<{message?: string}>("reset-password", {email, otp, newPassword}, "PUT");
+  clearTokens();
+  return result;
+}
+
+export async function resendVerification(email: string): Promise<{message?: string; delivery?: string}> {
+  return authPost("resend-verification", {email});
 }
 
 export interface Profile {
@@ -249,22 +209,6 @@ export async function logout() {
   if (typeof window !== "undefined") {
     localStorage.removeItem("user");
   }
-}
-
-export interface StudySession {
-  id?: number | string;
-  started_at?: string;
-  ended_at?: string | null;
-  duration_seconds?: number;
-  [key: string]: unknown;
-}
-
-export function startSession(): Promise<StudySession> {
-  return apiFetch<StudySession>("sessions/start", { method: "POST" });
-}
-
-export function endSession(): Promise<StudySession> {
-  return apiFetch<StudySession>("sessions/end", { method: "POST" });
 }
 
 export function readApiError(err: unknown, fallback = "Có lỗi xảy ra, thử lại sau."): string {
@@ -316,6 +260,7 @@ export interface Movie {
   rating: number;
   createdAt?: string;
   updatedAt?: string;
+  showtimes?: Showtime[];
 }
 
 export interface CreateMoviePayload {
@@ -334,6 +279,21 @@ export interface CreateMoviePayload {
 }
 
 export type UpdateMoviePayload = Partial<CreateMoviePayload>;
+
+export async function getGenres(): Promise<Genre[]> {
+  return unwrapData<Genre[]>(await apiFetch("genres"));
+}
+
+export interface MovieFilters {
+  keyword?: string; genre?: string; cinemaId?: string; date?: string; minPrice?: string; maxPrice?: string;
+  status?: MovieStatusEnum;
+}
+export async function searchMovies(filters: MovieFilters = {}): Promise<Movie[]> {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") params.set(key, value); });
+  const response = await apiFetch<{data: {items: Movie[]}}>(`search/movies?${params}`);
+  return response.data.items;
+}
 
 export async function getMovies(): Promise<Movie[]> {
   const res = await apiFetch<{ message: string; data: Movie[] }>("movies");
@@ -515,6 +475,11 @@ export interface Seat {
   updatedAt?: string;
 }
 
+export interface SeatTypeRecord { id: number; name: SeatType; priceCoefficient: number | string }
+export async function getSeatTypes(): Promise<SeatTypeRecord[]> {
+  return unwrapData<SeatTypeRecord[]>(await apiFetch("seats/types"));
+}
+
 export interface GenerateSeatsGridPayload {
   roomId: number;
   rows: string[];
@@ -528,7 +493,12 @@ export interface CreateSeatPayload {
   column: number;
   seatNumber: string;
   type: SeatType;
-  priceMultiplier?: number;
+}
+
+export type UpdateSeatPayload = Partial<Omit<CreateSeatPayload, "roomId">>;
+
+export async function updateSeat(id: number, payload: UpdateSeatPayload) {
+  return unwrapData<Seat>(await apiFetch(`seats/${id}`, {method: "PATCH", body: JSON.stringify(payload)}));
 }
 
 function unwrapData<T>(res: unknown): T {
@@ -757,7 +727,7 @@ export interface BookingDetail {
     };
     room?: {
       id: number;
-      roomName: string;
+      name: string;
       type?: string;
       totalSeats?: number;
       cinema?: {
@@ -775,6 +745,7 @@ export interface CancelTicketResponse {
   status: string;
   mode?: string;
   message?: string;
+  refundAmount?: number | string;
 }
 
 export async function getMyBookings(): Promise<BookingDetail[]> {
@@ -906,6 +877,11 @@ export async function getTopMoviesRevenue(limit: number = 10): Promise<TopMovieR
   );
   const result = unwrapData<TopMovieRevenue[]>(res);
   return Array.isArray(result) ? result : [];
+}
+
+export interface DailyRevenue { date: string; bookingCount: number; revenue: number }
+export async function getDailyRevenue(): Promise<DailyRevenue[]> {
+  return unwrapData<DailyRevenue[]>(await apiFetch("statistics/daily-revenue"));
 }
 
 export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {

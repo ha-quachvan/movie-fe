@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { Movie } from "@/lib/mockData";
+import { Movie } from "@/lib/catalog";
 
 interface MovieCardProps {
   movie: Movie;
@@ -65,7 +65,7 @@ export default function MovieCard({ movie, onWatchTrailer }: MovieCardProps) {
         {/* Hover Action Overlay */}
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2.5 bg-neutral-950/75 p-4 opacity-0 backdrop-blur-xs transition-opacity duration-300 group-hover:opacity-100">
           <a
-            href={`/movies?demo=1&keyword=${encodeURIComponent(movie.title)}`}
+            href={`/movies/${movie.id}`}
             className="w-full rounded-xl bg-gradient-to-r from-red-600 to-rose-600 py-2.5 text-center text-xs sm:text-sm font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:scale-105 active:scale-95"
           >
             Đặt Vé Ngay

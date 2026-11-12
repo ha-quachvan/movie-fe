@@ -3,7 +3,7 @@
 import Image from "next/image";
 
 import { useEffect, useState } from "react";
-import { Movie } from "@/lib/mockData";
+import { Movie } from "@/lib/catalog";
 
 interface HeroBannerProps {
   movies: Movie[];

@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import AdminNav from "@/components/admin/AdminNav";
 import {
   getStatisticsSummary,
+  getDailyRevenue,
   getTopMoviesRevenue,
   getMonthlyRevenue,
   getSeatOccupancy,
@@ -95,6 +96,8 @@ export default function AdminStatisticsPage() {
   const [iterations, setIterations] = useState<number>(100);
   const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResponse | null>(null);
   const [benchmarkError, setBenchmarkError] = useState("");
+
+  const daily = useQuery({ queryKey: ["admin-stats-daily"], queryFn: getDailyRevenue });
 
   // 1. Fetch Overview KPIs
   const { data: summary, isLoading: isLoadingSummary } = useQuery<OverviewSummary>({
@@ -379,6 +382,13 @@ export default function AdminStatisticsPage() {
               </div>
             </div>
 
+            <section style={{padding: 24, marginBottom: 24, border: "1px solid #333", borderRadius: 12}}>
+              <h2>Doanh thu theo ngày (giờ Việt Nam)</h2>
+              {daily.isLoading ? <p>Đang tải…</p> : daily.isError ? <p role="alert">{readApiError(daily.error)}</p> : !daily.data?.length ? <p>Chưa có doanh thu theo ngày.</p> :
+                <table style={{width: "100%", textAlign: "left"}}><thead><tr><th>Ngày</th><th>Booking thành công</th><th>Doanh thu</th></tr></thead>
+                  <tbody>{daily.data.map(row => <tr key={row.date}><td>{row.date}</td><td>{row.bookingCount}</td><td>{Number(row.revenue).toLocaleString("vi-VN")} ₫</td></tr>)}</tbody>
+                </table>}
+            </section>
             {/* Khối Biểu Đồ Doanh Thu Theo Tháng & Xếp Hạng Top Phim */}
             <div
               style={{
