@@ -1,4 +1,4 @@
-[Hướng dẫn Docker, Stripe, phpMyAdmin và Redis CLI](https://github.com/ha-quachvan/BTL_DBMS_BE/blob/feat/real-data-booking-integration/LOCAL_DEMO.md)
+[Hướng dẫn Docker, Stripe, phpMyAdmin và Redis CLI](https://github.com/Anh-Tuan1412/BTL_DBMS_BE/blob/feat/real-data-booking-integration/LOCAL_DEMO.md)
 # app cho phim · Frontend
 
 Giao diện web của **app cho phim** — quản lý rạp phim, đặt vé và doanh thu. Xây bằng **Next.js (App Router) + React + TypeScript + Tailwind CSS v4**, kết nối backend NestJS.
